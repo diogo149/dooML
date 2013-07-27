@@ -1,0 +1,26 @@
+language: PYTHON
+name: "???"
+
+variable {
+ name: "log_alpha"
+ type: FLOAT
+ size: 1
+ min:  -5
+ max:  5
+}
+
+variable {
+ name: "l1_ratio"
+ type: FLOAT
+ size: 1
+ min:  0
+ max:  1
+}
+
+variable {
+ name: "log_eta0"
+ type: FLOAT
+ size: 1
+ min:  -5
+ max:  5
+}

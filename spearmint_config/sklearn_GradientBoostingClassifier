@@ -1,0 +1,58 @@
+language: PYTHON
+name: "???"
+
+variable {
+ name: "n_estimators"
+ type: INT
+ size: 1
+ min:  128
+ max:  1024
+}
+
+variable {
+ name: "max_features"
+ type: INT
+ size: 1
+ min:  16
+ max:  1024
+}
+
+variable {
+ name: "max_depth"
+ type: INT
+ size: 1
+ min:  1
+ max:  10
+}
+
+variable {
+ name: "min_samples_split"
+ type: INT
+ size: 1
+ min:  2
+ max:  50
+}
+
+variable {
+ name: "min_samples_leaf"
+ type: INT
+ size: 1
+ min:  1
+ max:  20
+}
+
+variable {
+ name: "log_learning_rate"
+ type: FLOAT
+ size: 1
+ min:  -7
+ max:  0
+}
+
+variable {
+ name: "subsample"
+ type: FLOAT
+ size: 1
+ min:  0.01
+ max:  1
+}
