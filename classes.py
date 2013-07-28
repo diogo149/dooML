@@ -19,6 +19,7 @@
     -kmeans_linear_model
     -MachineFactory
     -infinity_remover
+    -ValidationFeature
 
     -BinningMachine
     -NumpyBinningMachine
@@ -40,11 +41,14 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.linear_model import ElasticNet
+from sklearn.cross_validation import StratifiedKFold, KFold
 
 from storage import quick_write, quick_save, quick_load, quick_exists
 from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols
+from parallel import parmap
 from helper import sparse_filtering, gap_statistic
 
+# these are imported so that they can be imported from this file
 from helper.binning_machine import BinningMachine, NumpyBinningMachine
 from helper.sampling_machine import classification_sampling_machine, regression_sampling_machine
 
@@ -421,7 +425,38 @@ class MachineFactory(GenericObject):
 
 
 def infinity_remover():
+    """ returns a class that removes infinity columns from a data frame
+    """
     return MachineFactory(fit_func=get_no_inf_cols, predict_func=remove_inf_cols)
+
+
+class ValidationFeature(MachineWrapper):
+
+    """ Creates cross-validated features when training.Requires being in a Trial in order to predict.
+    """
+
+    _default_args = dict(n_jobs=1, stratified=False, n_folds=3, validation_set=False, cv_X=None, cv_y=None)
+
+    def predict(self, X, y=None):
+        if Trial.train_mode():
+            if self.validation_set:
+                return self.fit_predict((self.cv_X, self.cv_y, X))
+            else:
+                kfold = list(StratifiedKFold(y, self.n_folds) if self.stratified else KFold(y.shape[0], self.n_folds, shuffle=True))
+                items = [(X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
+                mapped = parmap(self.fit_predict, items)
+                prediction = np.ones(y.shape)
+                for (_, test_idx), vals in zip(kfold, mapped):
+                    prediction[test_idx] = vals
+                return prediction
+        else:
+            return self.clf.predict(X)
+
+    def fit_predict(self, item):
+        X, y, X_test = item
+        tmp_clf = deepcopy(self.clf)
+        tmp_clf.fit(X, y)
+        return tmp_clf.predict(X_test)
 
 
 if __name__ == "__main__":
