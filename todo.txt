@@ -1,0 +1,19 @@
+decorators
+    -make decorator decorator to easily create decorators that take input
+
+sampling_machine
+    -make parallel
+
+feature_selection
+    -near zero variance filter
+
+binning_machine
+    -predict_proba
+
+sparse_filtering
+    -rewrite to be more clear / efficient
+    -rewrite cython
+
+to make:
+    -exploration
+    -visualization

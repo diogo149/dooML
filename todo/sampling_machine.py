@@ -1,17 +1,13 @@
-"""
-TODO make parallel
-"""
-
 import numpy as np
 import multiprocessing
 
 from copy import deepcopy
-from scipy.stats import mode
+from scipy import stats
 from sklearn.cross_validation import ShuffleSplit, StratifiedShuffleSplit
 
 
 def mode_wrapper(*args, **kwargs):
-    return mode(*args, **kwargs)[0]
+    return stats.mode(*args, **kwargs)[0]
 
 
 class SamplingMachine(object):

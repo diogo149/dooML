@@ -5,7 +5,7 @@ from utils import try_mkdir
 
 
 class Trial(object):
-    DIRECTORY = "trial"
+    DIRECTORY = "trials"
 
     def __init__(self, description, **kwargs):
         self._trial = dict(**kwargs)

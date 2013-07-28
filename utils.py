@@ -1,9 +1,4 @@
-"""
-TODO
-    -
-
-Table of Contents:
-    -print_pickle
+"""Table of Contents:
     -debug
     -column_append
     -to_float
@@ -15,14 +10,10 @@ Table of Contents:
     -hash_numpy_int
     -hash_numpy
     -hash_df
-    -quick_save
-    -quick_load
-    -try_mkdir
     -binarize
     -current_time
     -print_current_time
     -is_categorical
-    -quick_cache
     -interaction_terms
     -add_index_to_columns
 
@@ -30,11 +21,8 @@ Table of Contents:
 from __future__ import print_function
 import numpy as np
 import pandas as pd
-import cPickle as pickle
-import gc
 
 from pdb import set_trace
-from os import makedirs, path
 from datetime import datetime
 from sklearn.preprocessing import LabelBinarizer
 
@@ -42,16 +30,6 @@ from decorators import default_catcher
 import SETTINGS
 
 debug = set_trace
-
-
-def print_pickle(filename):
-    """
-    Prints the content of a pickle file.
-    """
-    with open(filename) as infile:
-        x = pickle.load(infile)
-        print(x)
-    return x
 
 
 def column_append(s, df):
@@ -132,37 +110,6 @@ def hash_df(df):
     return hash_numpy(df.as_matrix())
 
 
-def quick_save(directory, filename, obj):
-    """Quickly pickle an object in a file.
-    """
-    try_mkdir(directory)
-    gc.disable()
-    new_filename = path.join(directory, filename + ".pickle")
-    with open(new_filename, 'w') as outfile:
-        pickle.dump(obj, outfile, pickle.HIGHEST_PROTOCOL)
-    gc.enable()
-
-
-def quick_load(directory, filename):
-    """Quickly unpickle an object from a file.
-    """
-    new_filename = path.join(directory, filename + ".pickle")
-    gc.disable()
-    with open(new_filename) as infile:
-        obj = pickle.load(infile)
-    gc.enable()
-    return obj
-
-
-def try_mkdir(directory):
-    """ try to make directory
-    """
-    try:
-        makedirs(directory)
-    except OSError:
-        pass
-
-
 def binarize(data):
     """ convert categorical data into a matrix of 0's and 1's
     """
@@ -198,18 +145,6 @@ def is_categorical(X):
         return False
     else:
         return True
-
-
-def quick_cache(unique_name, func, *args, **kwargs):
-    """ an easy to use fast cache
-    """
-    try:
-        return quick_load(SETTINGS.QUICK_CACHE.DIRECTORY, unique_name)
-    except:
-        print("Quick Cache Miss: {}".format(unique_name))
-        result = func(*args, **kwargs)
-        quick_save(SETTINGS.QUICK_CACHE.DIRECTORY, unique_name, result)
-        return result
 
 
 def interaction_terms(df, feat1, feat2):

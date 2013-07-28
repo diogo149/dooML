@@ -1,10 +1,4 @@
-"""
-TODO:
-    -random trees feature selection
-    -lasso feature selection
-    -sgd feature selection
-
-Table of Contents:
+"""Table of Contents:
     -remove_inf_cols
 """
 
@@ -12,10 +6,8 @@ import pandas as pd
 import numpy as np
 
 from param import Param
-from decorators import timer
 
 
-@timer
 def remove_inf_cols(df):
     """
     Removes columns with infinite values.

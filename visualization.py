@@ -1,3 +1,7 @@
+"""Table of Contents
+    -gbm_learning_curve
+"""
+
 import pylab
 
 

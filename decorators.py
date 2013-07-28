@@ -1,6 +1,14 @@
+"""Table of Contents
+    -decorator_template
+    -default_catcher
+    -log
+    -timer
+    -trace_error
+"""
+
 from __future__ import print_function
 from time import time
-from param import SETTINGS
+import SETTINGS
 from pdb import set_trace
 
 
@@ -32,10 +40,8 @@ def log(func):
     """
     Logs input, output, and time takes of a decorated function.
     """
-    SETTINGS.default(LOG=False)
-
     def wrapped(*args, **kwargs):
-        if SETTINGS.LOG:
+        if SETTINGS.DECORATORS.LOG:
             print("Calling function: " + func.func_name)
             print("  Arguments:")
             for arg in args:
@@ -45,7 +51,7 @@ def log(func):
                 print("    {}: {}".format(k, v))
             start_time = time()
         output = func(*args, **kwargs)
-        if SETTINGS.LOG:
+        if SETTINGS.DECORATORS.LOG:
             print("Returning function: " + func.func_name)
             print("Took {} seconds".format(time() - start_time))
             print("  Output:")
@@ -100,7 +106,7 @@ if __name__ == "__main__":
         return [1, 2, 3, 4, 5]
 
     sample(1, 2, 3, 4, e=8, f=9)
-    SETTINGS.LOG = True
+    SETTINGS.DECORATORS.LOG = True
     sample(1, 2, 3, 4, e=8, f=9)
 
     @trace_error

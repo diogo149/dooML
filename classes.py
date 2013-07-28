@@ -1,9 +1,8 @@
-"""
-TODO
-    -
-
-Table of Contents
+"""Table of Contents
     -GenericObject
+    -ContextManagerObject
+    -INSTANCE_GETATTR
+    -SingletonContextManagerObject
     -MachineWrapper
     -PredictReshaper
     -PrefitMachine
@@ -12,21 +11,26 @@ Table of Contents
     -NumericalToCategorical
     -CategoricalToNumerical
     -FittedClustering
-    -FittedMiniBatchKMeans
-    -FittedKMeans
+    -fitted_minibatchkmeans
+    -fitted_kmeans
+    -TransformPredictMachine
+    -kmeans_linear_model
 """
 
 import numpy as np
 import re
 
+from types import MethodType
+from functools import partial
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import MiniBatchKMeans, KMeans
+from sklearn.linear_model import ElasticNet
 
 
-from utils import quick_save, is_categorical
-from helper import sparse_filtering
-from helper.gap_statistic import gap_statistic
+from storage import quick_save
+from utils import is_categorical
+from helper import sparse_filtering, gap_statistic
 
 
 class GenericObject(object):
@@ -48,6 +52,9 @@ class GenericObject(object):
     def __str__(self):
         return repr(self)
 
+    def __call__(self, **kwargs):
+        self._trial.update(**kwargs)
+
     def _pre_init(self, kwargs):
         pass  # override me
 
@@ -60,6 +67,44 @@ class GenericObject(object):
 
     def __get_class_arg(self, name, default=None):
         return self.__class__.__dict__.get(name, default)
+
+
+class ContextManagerObject(GenericObject):
+
+    """ generic object for easy use with context managers
+    """
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
+class INSTANCE_GETATTR(type):
+
+    """ metaclass that redirects non-static calls to the child class' INSTANCE object
+    """
+
+    def __getattribute__(cls, name):
+        func = type.__getattribute__(cls, name)
+        if isinstance(func, MethodType):
+            func = partial(func, cls.INSTANCE)
+        return func
+
+
+class SingletonContextManagerObject(ContextManagerObject):
+
+    __metaclass__ = INSTANCE_GETATTR
+
+    def __enter__(self):
+        assert self.__class__.__dict__.get('INSTANCE') is None, self.__class__.__dict__.get('INSTANCE')
+        self.__class__.INSTANCE = self
+        return super(SingletonContextManagerObject, self).__enter__()
+
+    def __exit__(self, *args, **kwargs):
+        self.__class__.INSTANCE = None
+        return super(SingletonContextManagerObject, self).__exit__(*args, **kwargs)
 
 
 class MachineWrapper(GenericObject):
@@ -124,7 +169,7 @@ class NumericalToCategorical(GenericObject):
 
     def _post_init(self, kwargs):
         if kwargs['clustering'] is None:
-            self.clustering = FittedMiniBatchKMeans(self.min_clusters)
+            self.clustering = fitted_minibatchkmeans(self.min_clusters)
 
     def fit(self, X, y=None):
         self._verify(X, self.verify)
@@ -188,10 +233,11 @@ class FittedClustering(GenericObject):
     """ clustering algorithm that uses gap statistic to automatically determine how many clusters to use
     """
 
+    _required_args = ('clustering',)
     _default_args = dict(min_clusters=1)
 
     def fit(self, X, y=None):
-        num_clusters = max(gap_statistic(X), self.min_clusters)
+        num_clusters = max(gap_statistic.gap_statistic(X), self.min_clusters)
         clustering = self.__get_class_arg("_clustering")
         self.clf = clustering(num_clusters)
         self.clf.fit(X)
@@ -211,9 +257,28 @@ class FittedClustering(GenericObject):
         return self.predict(X)
 
 
-class FittedMiniBatchKMeans(FittedClustering):
-    _clustering = MiniBatchKMeans
+def fitted_minibatchkmeans(min_clusters=1):
+    return FittedClustering(clustering=MiniBatchKMeans, min_clusters=min_clusters)
 
 
-class FittedKMeans(FittedClustering):
-    _clustering = KMeans
+def fitted_kmeans(min_clusters=1):
+    return FittedClustering(clustering=KMeans, min_clusters=min_clusters)
+
+
+class TransformPredictMachine(GenericObject):
+
+    _required_args = ('transformer', 'predicter')
+
+    def fit(self, X, y):
+        tmp = self.transformer.fit_transform(X, y)
+        self.predicter.fit(tmp, y)
+
+    def predict(self, X):
+        tmp = self.transformer.transform(X)
+        return self.predicter.predict(tmp)
+
+
+def kmeans_linear_model(n_clusters=2, alpha=1.0, l1_ratio=0.5, fit_intercept=True, positive=False):
+    transformer = MiniBatchKMeans(n_clusters=n_clusters, compute_labels=False, random_state=None)
+    predicter = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=fit_intercept, positive=positive)
+    return TransformPredictMachine(transformer, predicter)

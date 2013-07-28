@@ -1,8 +1,4 @@
-"""
-TODO
-    -
-
-Table of Contents
+"""Table of Contents
     -parmap
     -pipe_parmap
 """
@@ -42,6 +38,9 @@ def pipe_parmap(f, X, nprocs=multiprocessing.cpu_count()):
                     break
                 q_out.put((i, f(x)))
         return fun
+
+    if nprocs == 1:
+        return map(f, X)
     q_in = multiprocessing.Queue(1)
     q_out = multiprocessing.Queue()
 

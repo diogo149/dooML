@@ -1,9 +1,4 @@
-"""
-TODO:
-    -imputation using classifiers (k-nn, etc.)
-    -category frequencies
-
-Table of Contents:
+"""Table of Contents:
     -to_float
     -generic_string_transform
     -scale
