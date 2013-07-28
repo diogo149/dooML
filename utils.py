@@ -173,4 +173,24 @@ def interaction_terms(df, feat1, feat2):
 
 
 def add_index_to_columns(df):
+    """ adds an index number to each column of a dataframe (useful if two or more columns share a name)
+    """
     return pd.DataFrame(df.as_matrix(), columns=["{}_{}".format(i, j) for i, j in enumerate(df.columns)])
+
+
+def get_no_inf_cols(x):
+    """ returns which columns do not have infinite values
+    """
+    return np.isinf(x).sum(axis=0) == 0
+
+
+def remove_inf_cols(no_inf, df):
+    """
+    Removes columns with infinite values.
+
+    Looks for infinite values twice because the columns with infinite values in the training set may be different than in the test set. (fills these values with column means)
+    """
+    assert isinstance(df, pd.DataFrame)
+    df_no_inf = df.ix[:, no_inf]
+    df_no_inf[np.isinf(df_no_inf)] = 0
+    return df_no_inf

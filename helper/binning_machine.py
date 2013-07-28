@@ -20,6 +20,9 @@ def predict_with_clf(X, item):
 
 class BinningMachine(object):
 
+    """ Class that allows a separate classifier to be trained for each of the possible values of a feature.
+    """
+
     def __init__(self, clf, metafeature, n_jobs=1):
         self.clf = clf
         self.metafeature = metafeature

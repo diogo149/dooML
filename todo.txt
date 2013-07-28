@@ -4,7 +4,7 @@ decorators
 sampling_machine
     -make parallel
 
-feature_selection
+classes
     -near zero variance filter
 
 binning_machine
@@ -15,5 +15,7 @@ sparse_filtering
     -rewrite cython
 
 to make:
+    -CVFeature
+    -elm transform(n_hidden, activation function)
     -exploration
     -visualization

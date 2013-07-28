@@ -12,13 +12,16 @@ def mode_wrapper(*args, **kwargs):
 
 class SamplingMachine(object):
 
+    """ Class that trains several classifiers on a small sample of the data and returns a combination of their predictions.
+    """
+
     COMBINE_FUNCS = {
         "mean": np.mean,
         "mode": mode_wrapper,
         "median": np.median,
     }
 
-    def __init__(self, clf, predict_combine="mean", sample_size=200, stratified_shuffle=False, iterations=10, n_jobs=1, random_state=1):
+    def __init__(self, clf, predict_combine="mean", sample_size=200, stratified_shuffle=False, iterations=10, n_jobs=1):
         assert predict_combine in SamplingMachine.COMBINE_FUNCS
         assert isinstance(n_jobs, int)
         self.clf = deepcopy(clf)
@@ -27,7 +30,6 @@ class SamplingMachine(object):
         self.stratified_shuffle = stratified_shuffle
         self.iterations = iterations
         self.n_jobs = n_jobs if n_jobs > 0 else multiprocessing.cpu_count()
-        self.random_state = random_state
 
     def fit(self, X, y):
         train = np.array(X)
@@ -51,11 +53,11 @@ class SamplingMachine(object):
         data = []
         for clf in self.clfs:
             data.append(clf.predict_proba(X))
-        return SamplingMachine.combine(data)
+        return SamplingMachine.combine(data, predict_combine="mean")
 
     def shuffle_split_indices(self, y):
         n_rows = len(y)
-        params = dict(n_iter=self.iterations, test_size=self.sample_size, random_state=self.random_state)
+        params = dict(n_iter=self.iterations, test_size=self.sample_size)
         if n_rows <= self.sample_size:
             params['n_iter'] = 1
             params['test_size'] = n_rows
@@ -71,12 +73,12 @@ class SamplingMachine(object):
         return combine_func(np.array(data), axis=0)
 
 
-def classification_sampling_machine(clf, predict_combine="mode", sample_size=200, stratified_shuffle=True, iterations=10, n_jobs=1, random_state=1):
-    return SamplingMachine(clf, predict_combine, sample_size, stratified_shuffle, iterations, n_jobs, random_state)
+def classification_sampling_machine(clf, sample_size=200, iterations=10, n_jobs=1):
+    return SamplingMachine(clf, predict_combine="mode", sample_size=sample_size, stratified_shuffle=True, iterations=iterations, n_jobs=n_jobs)
 
 
-def regression_sampling_machine(clf, predict_combine="mean", sample_size=200, stratified_shuffle=False, iterations=10, n_jobs=1, random_state=1):
-    return SamplingMachine(clf, predict_combine, sample_size, stratified_shuffle, iterations, n_jobs, random_state)
+def regression_sampling_machine(clf, sample_size=200, iterations=10, n_jobs=1):
+    return SamplingMachine(clf, predict_combine="mean", sample_size=sample_size, stratified_shuffle=False, iterations=iterations, n_jobs=n_jobs)
 
 if __name__ == "__main__":
     from sklearn.svm import LinearSVC, SVR

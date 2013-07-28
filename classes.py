@@ -3,6 +3,8 @@
     -ContextManagerObject
     -INSTANCE_GETATTR
     -SingletonContextManagerObject
+    -Trial
+    -FeatureCache
     -MachineWrapper
     -PredictReshaper
     -PrefitMachine
@@ -15,11 +17,23 @@
     -fitted_kmeans
     -TransformPredictMachine
     -kmeans_linear_model
+    -MachineFactory
+    -infinity_remover
+
+    -BinningMachine
+    -NumpyBinningMachine
+    -classification_sampling_machine
+    -regression_sampling_machine
 """
-
+from __future__ import print_function
 import numpy as np
+import pandas as pd
 import re
+import random
+import warnings
 
+from time import time
+from copy import deepcopy
 from types import MethodType
 from functools import partial
 from sklearn.preprocessing import LabelBinarizer
@@ -27,10 +41,12 @@ from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.linear_model import ElasticNet
 
-
-from storage import quick_save
-from utils import is_categorical
+from storage import quick_write, quick_save, quick_load, quick_exists
+from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols
 from helper import sparse_filtering, gap_statistic
+
+from helper.binning_machine import BinningMachine, NumpyBinningMachine
+from helper.sampling_machine import classification_sampling_machine, regression_sampling_machine
 
 
 class GenericObject(object):
@@ -53,7 +69,7 @@ class GenericObject(object):
         return repr(self)
 
     def __call__(self, **kwargs):
-        self._trial.update(**kwargs)
+        self.__dict__.update(**kwargs)
 
     def _pre_init(self, kwargs):
         pass  # override me
@@ -105,6 +121,111 @@ class SingletonContextManagerObject(ContextManagerObject):
     def __exit__(self, *args, **kwargs):
         self.__class__.INSTANCE = None
         return super(SingletonContextManagerObject, self).__exit__(*args, **kwargs)
+
+
+class Trial(SingletonContextManagerObject):
+
+    """ Class that allows one to only fit machines when training, and to use trained machines while testing by changing one function call. Use with a context manager:
+
+        with Trial.train("description..."):
+            # train classifiers, etc.
+    """
+    DIRECTORY = "trials"
+    _required_args = ('description', 'train_mode')
+
+    def _post_init(self, kwargs):
+        assert isinstance(self.description, str)
+        self.filename = np.abs(hash(self.description))
+        if self.train_mode:
+            assert not quick_exists(Trial.DIRECTORY, self.filename, "txt"), self.filename
+            quick_write(Trial.DIRECTORY, self.filename, "")
+            quick_save(Trial.DIRECTORY, self.filename, None)
+            self.clf_times = []
+            self.clfs = []
+        else:
+            self.__dict__ = quick_load(Trial.DIRECTORY, self.filename).__dict__
+            self.train_mode = False
+        np.random.seed(self.filename)
+        random.seed(self.filename)
+
+    @staticmethod
+    def train(description):
+        return Trial(description=description, train_mode=True)
+
+    @staticmethod
+    def test(description):
+        return Trial(description=description, train_mode=False)
+
+    def close(self):
+        if self.train_mode:
+            quick_write(Trial.DIRECTORY, self.filename, self)
+            quick_save(Trial.DIRECTORY, self.filename, self)
+
+    def fit(self, clf, *args, **kwargs):
+        """ returns a fitted classifier
+        """
+        if self.train_mode:
+            start_time = time()
+            clf.fit(*args, **kwargs)
+            self.clf_times.append(time() - start_time)
+            self.clfs.append(deepcopy(clf))
+            return clf
+        else:
+            trained_clf = self.clfs.pop(0)
+            assert isinstance(trained_clf, clf.__class__)
+            return trained_clf
+
+    def log(self, **kwargs):
+        self(**kwargs)
+
+    def train_mode(self):
+        return self.train_mode
+
+
+class FeatureCache(object):
+
+    def __init__(self, df):
+        self._rows = df.shape[0]
+        self._directory = hash_df(df)
+        try_mkdir(self._directory)
+        self.raw = df
+
+    def validate(self, df, is_safe=True):
+        assert isinstance(df, pd.DataFrame), df.__class__
+        assert len(df.shape) == 2, df.shape
+        assert df.shape[0] == self._rows, (df.shape, self._rows)
+        if is_safe:
+            try:
+                df.astype(np.float)
+            except ValueError:
+                assert False, "DataFrame is not numeric in FeatureCache."
+            assert not np.any(pd.isnull(df))
+            assert not np.any(np.isinf(df))
+
+    def _put(self, is_safe, name, func, *args, **kwargs):
+        result = func(*args, **kwargs)
+        self.validate(result, is_safe=is_safe)
+        result = result.astype(np.float) if is_safe else result
+        quick_save(self._directory, name, result)
+        return result
+
+    def put_unsafe(self, name, func, *args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self._put(False, name, func, *args, **kwargs)
+
+    def put(self, name, func, *args, **kwargs):
+        return self._put(True, name, func, *args, **kwargs)
+
+    def get(self, name):
+        return quick_load(self._directory, name)
+
+    def cache(self, name, func, *args, **kwargs):
+        try:
+            return self.get(name)
+        except:
+            print("Feature Cache Miss: {}".format(name))
+            return self.put(name, func, *args, **kwargs)
 
 
 class MachineWrapper(GenericObject):
@@ -282,3 +403,39 @@ def kmeans_linear_model(n_clusters=2, alpha=1.0, l1_ratio=0.5, fit_intercept=Tru
     transformer = MiniBatchKMeans(n_clusters=n_clusters, compute_labels=False, random_state=None)
     predicter = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=fit_intercept, positive=positive)
     return TransformPredictMachine(transformer, predicter)
+
+
+class MachineFactory(GenericObject):
+
+    """ Class that allows wrapping of functions into a predicting machine. Assumes that the first input to the prediction function is the output of the fit function.
+    """
+
+    _required_args = ('fit_func', 'predict_func')
+
+    def fit(self, *args, **kwargs):
+        self.fit_params = self.fit_func(*args, **kwargs)
+        return self
+
+    def predict(self, *args, **kwargs):
+        return self.predict_func(self.fit_params, *args, **kwargs)
+
+
+def infinity_remover():
+    return MachineFactory(fit_func=get_no_inf_cols, predict_func=remove_inf_cols)
+
+
+if __name__ == "__main__":
+    from sklearn.linear_model import LinearRegression
+    with Trial.train("this is my description"):
+        x = np.random.randn(10, 10)
+        y = np.random.randn(10)
+        Trial.fit(LinearRegression(), x, y)
+        Trial.log(this="bananas")
+
+    with Trial.test("this is my description"):
+        clf = Trial.fit(LinearRegression())
+        print(clf.predict(np.random.randn(10, 10)) - np.random.randn(10))
+        Trial.log(hello="world")
+
+    """ check the generated text file and the pickle
+    """
