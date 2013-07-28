@@ -191,7 +191,6 @@ class FeatureCache(object):
     def __init__(self, df):
         self._rows = df.shape[0]
         self._directory = hash_df(df)
-        try_mkdir(self._directory)
         self.raw = df
 
     def validate(self, df, is_safe=True):

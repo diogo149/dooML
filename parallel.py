@@ -8,7 +8,7 @@ from functools import partial
 
 
 def parmap(func, in_vals, args=[], kwargs={}, n_jobs=1):
-    """ easy parallel map, but it pickles input arguments and thus can't be used for dynamically generated functions
+    """ easy parallel map, but it pickles input arguments and thus can't be used for dynamically generated functions. random functions appears to be deterministic if the random seed is set.
     """
     assert isinstance(n_jobs, int)
     assert n_jobs >= -1
