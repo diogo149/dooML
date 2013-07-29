@@ -108,6 +108,8 @@ def quick_write(directory, filename, obj):
         outfile.write(str(obj))
 
 
-def machine_cache(directory, unique_name, func, *args, **kwargs):
-    # TODO: dict cache
-    pass
+def machine_cache(filename, clf, *args, **kwargs):
+    """ caches a machine fit to data
+    """
+    unique_name = repr(clf)
+    return dictionary_cache(filename, unique_name, clf.fit, *args, **kwargs)
