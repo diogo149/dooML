@@ -16,6 +16,11 @@
     -is_categorical
     -interaction_terms
     -add_index_to_columns
+    -get_no_inf_cols
+    -remove_inf_cols
+    -args_expander
+    -fit_predict
+    -cv_fit_predict
 
 """
 from __future__ import print_function
@@ -216,9 +221,10 @@ def fit_predict(clf, X, y, X_test):
 def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
     """ returns cross-validation predictions of a machine
     """
+    assert isinstance(X, np.ndarray)
     kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(y.shape[0], n_folds, shuffle=True))
     items = [(clf, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
-    mapped = parmap(args_expander, items, (fit_predict,))
+    mapped = parmap(args_expander, items, args=(fit_predict,), n_jobs=n_jobs)
     prediction = np.ones(y.shape)
     for (_, test_idx), vals in zip(kfold, mapped):
         prediction[test_idx] = vals

@@ -20,6 +20,7 @@
     -MachineFactory
     -infinity_remover
     -ValidationFeature
+    -ResidualPredicter
 
     -BinningMachine
     -NumpyBinningMachine
@@ -197,10 +198,7 @@ class FeatureCache(object):
         assert len(df.shape) == 2, df.shape
         assert df.shape[0] == self._rows, (df.shape, self._rows)
         if is_safe:
-            try:
-                df.astype(np.float)
-            except ValueError:
-                assert False, "DataFrame is not numeric in FeatureCache."
+            df.astype(np.float)  # this should fail if dataframe isn't numeric
             assert not np.any(pd.isnull(df))
             assert not np.any(np.isinf(df))
 
