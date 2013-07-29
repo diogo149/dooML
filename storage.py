@@ -4,12 +4,14 @@
     -quick_exists
     -quick_save
     -quick_load
+    -file_cache
     -quick_cache
     -quick_write
 
 """
 import gc
 import cPickle as pickle
+import shelve
 from os import makedirs, path
 
 import SETTINGS
@@ -61,16 +63,40 @@ def quick_load(directory, filename):
     return obj
 
 
+def file_cache(directory, unique_name, func, *args, **kwargs):
+    """ a generic file-based cache that can be used to construct more complex caches. useful for storing bigger objects than a dictionary cache.
+    """
+    try:
+        return quick_load(directory, unique_name)
+    except:
+        print("Cache Miss: {}".format(unique_name))
+        result = func(*args, **kwargs)
+        quick_save(directory, unique_name, result)
+        return result
+
+
+def dictionary_cache(filename, unique_name, func, *args, **kwargs):
+    """ a generic file-based cache that can be used to construct more complex caches. useful for storing more objects than a file cache. NOT MULTIPROCESSING SAFE.
+    """
+    assert isinstance(unique_name, str), unique_name
+    try:
+        try:
+            s = shelve.open(filename, flag='r', protocol=pickle.HIGHEST_PROTOCOL)
+            return s[unique_name]
+        finally:
+            s.close()
+    except:
+        result = func(*args, **kwargs)
+        s = shelve.open(filename, flag='c', protocol=pickle.HIGHEST_PROTOCOL)
+        s[unique_name] = result
+        s.close()
+        return result
+
+
 def quick_cache(unique_name, func, *args, **kwargs):
     """ an easy to use fast cache
     """
-    try:
-        return quick_load(SETTINGS.QUICK_CACHE.DIRECTORY, unique_name)
-    except:
-        print("Quick Cache Miss: {}".format(unique_name))
-        result = func(*args, **kwargs)
-        quick_save(SETTINGS.QUICK_CACHE.DIRECTORY, unique_name, result)
-        return result
+    return file_cache(SETTINGS.QUICK_CACHE.DIRECTORY, unique_name, func, *args, **kwargs)
 
 
 def quick_write(directory, filename, obj):
@@ -80,3 +106,8 @@ def quick_write(directory, filename, obj):
     new_filename = path.join(directory, "{}.txt".format(filename))
     with open(new_filename, 'w') as outfile:
         outfile.write(str(obj))
+
+
+def machine_cache(directory, unique_name, func, *args, **kwargs):
+    # TODO: dict cache
+    pass
