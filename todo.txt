@@ -12,10 +12,22 @@ binning_machine
 
 sparse_filtering
     -rewrite to be more clear / efficient
-    -rewrite cython
+    -rewrite in cython
 
 to make:
-    -CVFeature
     -elm transform(n_hidden, activation function)
+        -elm transform with l1 feature selection
     -exploration
     -visualization
+    -feature creation file
+        -update generic_feature_creation to use num->cat and cat->num
+        -create function for creating features from a list of dates
+            -start time
+            -length
+            -end time
+            -number of occurences
+            -avg time between occurences
+            -max time between occurences
+            -min time between occurences
+            -etc ?
+        -use sklearn.semi_supervised for imputation

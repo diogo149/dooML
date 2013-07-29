@@ -44,7 +44,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.cross_validation import StratifiedKFold, KFold
 
 from storage import quick_write, quick_save, quick_load, quick_exists
-from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols
+from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, cv_fit_predict
 from parallel import parmap
 from helper import sparse_filtering, gap_statistic
 
@@ -439,15 +439,9 @@ class ValidationFeature(MachineWrapper):
     def predict(self, X, y=None):
         if Trial.train_mode():
             if self.validation_set:
-                return self.fit_predict((self.cv_X, self.cv_y, X))
+                return fit_predict(self.clf, self.cv_X, self.cv_y, X)
             else:
-                kfold = list(StratifiedKFold(y, self.n_folds) if self.stratified else KFold(y.shape[0], self.n_folds, shuffle=True))
-                items = [(X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
-                mapped = parmap(self.fit_predict, items)
-                prediction = np.ones(y.shape)
-                for (_, test_idx), vals in zip(kfold, mapped):
-                    prediction[test_idx] = vals
-                return prediction
+                return cv_fit_predict(self.clf, X, y, self.stratified, self.n_folds, self.n_jobs)
         else:
             return self.clf.predict(X)
 
@@ -456,6 +450,26 @@ class ValidationFeature(MachineWrapper):
         tmp_clf = deepcopy(self.clf)
         tmp_clf.fit(X, y)
         return tmp_clf.predict(X_test)
+
+
+class ResidualPredicter(GenericObject):
+
+    """ Predicts the residual of a classifier using another classifier.
+    """
+
+    _required_args = ('clf1',)
+    _default_args = dict(clf2=None)
+
+    # get validation feature
+
+    def fit(self, X, y):
+        predictions = self.clf1()
+        if self.clf2 is None:
+            # make GBM
+        # else do CV prediction
+
+    def predict(self, *args, **kwargs):
+        return self.clf2.predict(*args, **kwargs)
 
 
 if __name__ == "__main__":

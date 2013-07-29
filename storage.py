@@ -5,6 +5,7 @@
     -quick_save
     -quick_load
     -quick_cache
+    -quick_write
 
 """
 import gc

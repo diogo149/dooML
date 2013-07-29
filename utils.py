@@ -24,10 +24,13 @@ import pandas as pd
 
 from pdb import set_trace
 from datetime import datetime
+from copy import deepcopy
 from sklearn.preprocessing import LabelBinarizer
+from sklearn.cross_validation import StratifiedKFold, KFold
 
-from decorators import default_catcher
 import SETTINGS
+from decorators import default_catcher
+from parallel import parmap
 
 debug = set_trace
 
@@ -194,3 +197,29 @@ def remove_inf_cols(no_inf, df):
     df_no_inf = df.ix[:, no_inf]
     df_no_inf[np.isinf(df_no_inf)] = 0
     return df_no_inf
+
+
+def args_expander(func, item):
+    """ takes in a function and an iterable, and expands the iterable as the functions arguments. useful for parallel maps.
+    """
+    return func(*item)
+
+
+def fit_predict(clf, X, y, X_test):
+    """ makes a copy of a machine, then fits it on training data and predicts on test data. useful for parallel maps.
+    """
+    tmp_clf = deepcopy(clf)
+    tmp_clf.fit(X, y)
+    return tmp_clf.predict(X_test)
+
+
+def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
+    """ returns cross-validation predictions of a machine
+    """
+    kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(y.shape[0], n_folds, shuffle=True))
+    items = [(clf, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
+    mapped = parmap(args_expander, items, (fit_predict,))
+    prediction = np.ones(y.shape)
+    for (_, test_idx), vals in zip(kfold, mapped):
+        prediction[test_idx] = vals
+    return prediction
