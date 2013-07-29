@@ -41,11 +41,10 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.linear_model import ElasticNet
-from sklearn.cross_validation import StratifiedKFold, KFold
+from sklearn.ensemble import GradientBoostingRegressor
 
 from storage import quick_write, quick_save, quick_load, quick_exists
 from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, cv_fit_predict
-from parallel import parmap
 from helper import sparse_filtering, gap_statistic
 
 # these are imported so that they can be imported from this file
@@ -458,15 +457,17 @@ class ResidualPredicter(GenericObject):
     """
 
     _required_args = ('clf1',)
-    _default_args = dict(clf2=None)
+    _default_args = dict(clf2=None, n_folds=3, n_jobs=1)
 
     # get validation feature
 
     def fit(self, X, y):
-        predictions = self.clf1()
+        self.clf1.fit(X, y)
+        predictions = cv_fit_predict(self.clf1, X, y, n_folds=self.n_folds, n_jobs=self.n_jobs)
         if self.clf2 is None:
-            # make GBM
-        # else do CV prediction
+            self.clf2 = GradientBoostingRegressor(loss='huber', n_estimators=100, subsample=0.5, max_features=int(np.sqrt(X.shape[1])))
+        self.clf2.fit(X, predictions)
+        return y - self.clf2.predict(X)
 
     def predict(self, *args, **kwargs):
         return self.clf2.predict(*args, **kwargs)
