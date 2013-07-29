@@ -5,8 +5,10 @@
     -quick_save
     -quick_load
     -file_cache
+    -dictionary_cache
     -quick_cache
     -quick_write
+    -machine_cache
 
 """
 import gc

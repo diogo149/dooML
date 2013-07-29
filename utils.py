@@ -10,6 +10,7 @@
     -hash_numpy_int
     -hash_numpy
     -hash_df
+    -smart_hash
     -binarize
     -current_time
     -print_current_time
@@ -116,6 +117,21 @@ def hash_df(df):
     """Returns hashed value of pandas data frame.
     """
     return hash_numpy(df.as_matrix())
+
+
+def smart_hash(x):
+    """ checks the type of x and hashes appropriately. returns a string hash
+    """
+    if x is None:
+        return "None"
+    elif isinstance(x, pd.DataFrame):
+        return hash_df(x)
+    elif isinstance(x, np.ndarray):
+        return hash_numpy(x)
+    elif isinstance(x, (int, str, float, bool, long)):
+        return str(hash(x))
+    else:
+        raise Exception
 
 
 def binarize(data):

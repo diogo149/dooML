@@ -5,6 +5,7 @@
     -SingletonContextManagerObject
     -Trial
     -FeatureCache
+    -MachineCache
     -MachineWrapper
     -PredictReshaper
     -PrefitMachine
@@ -44,8 +45,8 @@ from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.linear_model import ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 
-from storage import quick_write, quick_save, quick_load, quick_exists
-from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, cv_fit_predict
+from storage import quick_write, quick_save, quick_load, quick_exists, machine_cache
+from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, cv_fit_predict, smart_hash
 from helper import sparse_filtering, gap_statistic
 
 # these are imported so that they can be imported from this file
@@ -226,6 +227,25 @@ class FeatureCache(object):
         except:
             print("Feature Cache Miss: {}".format(name))
             return self.put(name, func, *args, **kwargs)
+
+
+class MachineCache(GenericObject):
+
+    """ class for caching machines, based on their hash. the purpose of this class is to cache the hashes of the arrays.
+    """
+
+    _default_args = dict(store=None)
+
+    def _pre_init(self, kwargs):
+        if self.store is None:
+            self.store = dict()
+
+    def cache(self, clf, X, y=None):
+        item = (X, y)
+        if item not in self.store:
+            self.store[item] = "{}_{}".format(smart_hash(X), smart_hash(y))
+        filename = self.store(item)
+        return machine_cache(filename, clf, X, y)
 
 
 class MachineWrapper(GenericObject):
