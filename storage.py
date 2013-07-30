@@ -81,6 +81,7 @@ def dictionary_cache(filename, unique_name, func, *args, **kwargs):
     """ a generic file-based cache that can be used to construct more complex caches. useful for storing more objects than a file cache. NOT MULTIPROCESSING SAFE.
     """
     assert isinstance(unique_name, str), unique_name
+    filename = "{}.pickle".format(filename)
     try:
         try:
             s = shelve.open(filename, flag='r', protocol=pickle.HIGHEST_PROTOCOL)

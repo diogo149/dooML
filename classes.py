@@ -234,17 +234,20 @@ class MachineCache(GenericObject):
     """ class for caching machines, based on their hash. the purpose of this class is to cache the hashes of the arrays.
     """
 
-    _default_args = dict(store=None)
-
-    def _pre_init(self, kwargs):
-        if self.store is None:
-            self.store = dict()
+    def _post_init(self, kwargs):
+        # need to use two lists instead of a dictionary, to avoid hashing every time
+        self.input = []
+        self.hashes = []
 
     def cache(self, clf, X, y=None):
         item = (X, y)
-        if item not in self.store:
-            self.store[item] = "{}_{}".format(smart_hash(X), smart_hash(y))
-        filename = self.store(item)
+        try:
+            idx = self.input.index(item)
+        except ValueError:
+            idx = len(self.input)
+            self.input.append(item)
+            self.hashes.append("{}_{}".format(smart_hash(X), smart_hash(y)))
+        filename = self.hashes[idx]
         return machine_cache(filename, clf, X, y)
 
 
