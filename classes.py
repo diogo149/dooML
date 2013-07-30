@@ -32,7 +32,6 @@ from __future__ import print_function
 import numpy as np
 import pandas as pd
 import re
-import random
 import warnings
 
 from time import time
@@ -46,7 +45,8 @@ from sklearn.linear_model import ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 
 from storage import quick_write, quick_save, quick_load, quick_exists, machine_cache
-from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, cv_fit_predict, smart_hash
+from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, smart_hash, random_seed
+from utils2 import cv_fit_predict
 from helper import sparse_filtering, gap_statistic
 
 # these are imported so that they can be imported from this file
@@ -153,8 +153,7 @@ class Trial(SingletonContextManagerObject):
         else:
             self.__dict__ = quick_load(Trial.DIRECTORY, self.filename).__dict__
             self.train_mode = False
-        np.random.seed(self.filename)
-        random.seed(self.filename)
+        random_seed(self.filename)
 
     @staticmethod
     def train(description):

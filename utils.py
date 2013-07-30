@@ -14,6 +14,7 @@
     -binarize
     -current_time
     -print_current_time
+    -random_seed
     -is_categorical
     -interaction_terms
     -add_index_to_columns
@@ -21,22 +22,23 @@
     -remove_inf_cols
     -args_expander
     -fit_predict
-    -cv_fit_predict
+    -kfold_feature_scorer
+    -machine_score_func
 
 """
 from __future__ import print_function
 import numpy as np
 import pandas as pd
+import random
 
 from pdb import set_trace
 from datetime import datetime
 from copy import deepcopy
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.cross_validation import StratifiedKFold, KFold
+from sklearn.cross_validation import KFold
 
 import SETTINGS
 from decorators import default_catcher
-from parallel import parmap
 
 debug = set_trace
 
@@ -153,6 +155,15 @@ def print_current_time():
     print(current_time())
 
 
+def random_seed(x):
+    """ seeds random state
+    """
+    assert isinstance(x, int)
+    assert x >= 0
+    random.seed(x)
+    np.random.seed(x)
+
+
 def is_categorical(X):
     """ utility method to determine whether a feature is categorical
     """
@@ -234,14 +245,20 @@ def fit_predict(clf, X, y, X_test):
     return tmp_clf.predict(X_test)
 
 
-def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
-    """ returns cross-validation predictions of a machine
+def kfold_feature_scorer(num_features, score_func, k=2):
+    """ returns the average scores for datasets with each feature, given a scoring function
     """
-    assert isinstance(X, np.ndarray)
-    kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(y.shape[0], n_folds, shuffle=True))
-    items = [(clf, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
-    mapped = parmap(args_expander, items, args=(fit_predict,), n_jobs=n_jobs)
-    prediction = np.ones(y.shape)
-    for (_, test_idx), vals in zip(kfold, mapped):
-        prediction[test_idx] = vals
-    return prediction
+    result = np.empty(num_features)
+    for idx, _ in KFold(num_features, k, shuffle=True):
+        result[idx] += score_func(idx)
+    result /= (k - 1)
+    return result
+
+
+def machine_score_func(clf, X, y, X_test, y_test, metric):
+    """ returns the score of a specific machine on a specific dataset with a specific metric
+    """
+    new_clf = deepcopy(clf)
+    new_clf.fit(X, y)
+    predictions = new_clf.predict(X_test)
+    return metric(y_test, predictions)

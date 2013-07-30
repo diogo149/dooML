@@ -4,6 +4,7 @@
     -log
     -timer
     -trace_error
+    -ignore_args
 """
 
 from __future__ import print_function
@@ -17,7 +18,10 @@ def decorator_template(func):
     def wrapped(*args, **kwargs):
         return func(*args, **kwargs)
 
-    wrapped.func_name = func.func_name
+    try:
+        wrapped.func_name = func.func_name
+    except AttributeError:
+        pass
     return wrapped
 
 
@@ -31,7 +35,10 @@ def default_catcher(default_value):
                 return func(*args, **kwargs)
             except:
                 return default_value
-        wrapped.func_name = func.func_name
+        try:
+            wrapped.func_name = func.func_name
+        except AttributeError:
+            pass
         return wrapped
     return decorator
 
@@ -59,7 +66,10 @@ def log(func):
 
         return output
 
-    wrapped.func_name = func.func_name
+    try:
+        wrapped.func_name = func.func_name
+    except AttributeError:
+        pass
     return wrapped
 
 
@@ -74,7 +84,10 @@ def timer(func):
         print("Function {} took {} seconds.".format(func.func_name, time() - start_time))
         return output
 
-    wrapped.func_name = func.func_name
+    try:
+        wrapped.func_name = func.func_name
+    except AttributeError:
+        pass
     return wrapped
 
 
@@ -91,7 +104,22 @@ def trace_error(func):
             set_trace()
             return func(*args, **kwargs)
 
-    wrapped.func_name = func.func_name
+    try:
+        wrapped.func_name = func.func_name
+    except AttributeError:
+        pass
+    return wrapped
+
+
+def ignore_args(func):
+
+    def wrapped(*args, **kwargs):
+        return func()
+
+    try:
+        wrapped.func_name = func.func_name
+    except AttributeError:
+        pass
     return wrapped
 
 if __name__ == "__main__":
