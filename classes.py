@@ -116,6 +116,9 @@ class INSTANCE_GETATTR(type):
 
 class SingletonContextManagerObject(ContextManagerObject):
 
+    """ Made for inheritance for singletons that redirects non-static calls to the class' INSTANCE object. Also allows the class' INSTANCE object to be initialized with a context manager
+    """
+
     __metaclass__ = INSTANCE_GETATTR
 
     def __enter__(self):
