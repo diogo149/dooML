@@ -248,11 +248,11 @@ def fit_predict(clf, X, y, X_test):
 def kfold_feature_scorer(num_features, score_func, k=2):
     """ returns the average scores for datasets with each feature, given a scoring function
     """
-    result = np.empty(num_features)
+    result = np.zeros(num_features)
     for idx, _ in KFold(num_features, k, shuffle=True):
         result[idx] += score_func(idx)
     result /= (k - 1)
-    return result
+    return resultf
 
 
 def machine_score_func(clf, X, y, X_test, y_test, metric):
