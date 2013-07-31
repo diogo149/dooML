@@ -252,7 +252,7 @@ def kfold_feature_scorer(num_features, score_func, k=2):
     for idx, _ in KFold(num_features, k, shuffle=True):
         result[idx] += score_func(idx)
     result /= (k - 1)
-    return resultf
+    return result
 
 
 def machine_score_func(clf, X, y, X_test, y_test, metric):
