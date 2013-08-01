@@ -1,4 +1,5 @@
 """Table of Contents
+    -func_name
     -decorator_template
     -default_catcher
     -log
@@ -13,15 +14,19 @@ import SETTINGS
 from pdb import set_trace
 
 
+def func_name(func):
+    try:
+        return func.func_name
+    except AttributeError:
+        return "unnamed_function"
+
+
 def decorator_template(func):
 
     def wrapped(*args, **kwargs):
         return func(*args, **kwargs)
 
-    try:
-        wrapped.func_name = func.func_name
-    except AttributeError:
-        pass
+    wrapped.func_name = func_name(func)
     return wrapped
 
 
@@ -35,10 +40,7 @@ def default_catcher(default_value):
                 return func(*args, **kwargs)
             except:
                 return default_value
-        try:
-            wrapped.func_name = func.func_name
-        except AttributeError:
-            pass
+        wrapped.func_name = func_name(func)
         return wrapped
     return decorator
 
@@ -66,10 +68,7 @@ def log(func):
 
         return output
 
-    try:
-        wrapped.func_name = func.func_name
-    except AttributeError:
-        pass
+    wrapped.func_name = func_name(func)
     return wrapped
 
 
@@ -84,10 +83,7 @@ def timer(func):
         print("Function {} took {} seconds.".format(func.func_name, time() - start_time))
         return output
 
-    try:
-        wrapped.func_name = func.func_name
-    except AttributeError:
-        pass
+    wrapped.func_name = func_name(func)
     return wrapped
 
 
@@ -100,14 +96,11 @@ def trace_error(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            print("{} in {}: {}".format(e.__class__, func.func_name, e.message))
+            print("{} in {}: {}".format(e.__class__, func_name(func), e.message))
             set_trace()
             return func(*args, **kwargs)
 
-    try:
-        wrapped.func_name = func.func_name
-    except AttributeError:
-        pass
+    wrapped.func_name = func_name(func)
     return wrapped
 
 
@@ -116,10 +109,7 @@ def ignore_args(func):
     def wrapped(*args, **kwargs):
         return func()
 
-    try:
-        wrapped.func_name = func.func_name
-    except AttributeError:
-        pass
+    wrapped.func_name = func_name(func)
     return wrapped
 
 if __name__ == "__main__":
