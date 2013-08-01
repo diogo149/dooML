@@ -9,6 +9,11 @@
     -quick_cache
     -quick_write
     -machine_cache
+    -related_filenames
+    -modified_time
+    -backup_open
+    -quick_save2
+    -quick_load2
 
 """
 import gc
@@ -17,6 +22,7 @@ import shelve
 from os import makedirs, path
 
 import SETTINGS
+from decorators import default_catcher
 
 
 def print_pickle(filename):
@@ -116,3 +122,56 @@ def machine_cache(filename, clf, *args, **kwargs):
     """
     unique_name = repr(clf)
     return dictionary_cache(filename, unique_name, clf.fit, *args, **kwargs)
+
+
+def related_filenames(filename, num=2):
+    """ returns num filenames similar to the input
+    """
+    basename, extension = path.splitext(filename)
+    return ["{}_{}{}".format(basename, i, extension) for i in range(num)]
+
+
+@default_catcher(None)
+def modified_time(filename):
+    """ returns the time a file was modified, or None if it doesn't exist
+    """
+    return path.getmtime(filename)
+
+
+def backup_open(filename, flag='r', num=2):
+    """ writes and reads to/from a group of files, so that data isn't lost in case of a failure
+    """
+    assert flag in 'war'
+    filenames = related_filenames(filename, num)
+    times = map(modified_time, filenames)
+    try:
+        idx = times.index(None)
+    except ValueError:
+        if flag == 'r':
+            idx = max(range(num), key=lambda x: times[x])
+        else:
+            idx = min(range(num), key=lambda x: times[x])
+    new_filename = filenames[idx]
+    return open(new_filename, flag)
+
+
+def quick_save2(directory, filename, obj):
+    """Quickly pickle an object in a file, using backup_open
+    """
+    try_mkdir(directory)
+    gc.disable()
+    new_filename = path.join(directory, "{}.pickle".format(filename))
+    with backup_open(new_filename, 'w') as outfile:
+        pickle.dump(obj, outfile, pickle.HIGHEST_PROTOCOL)
+    gc.enable()
+
+
+def quick_load2(directory, filename):
+    """Quickly unpickle an object from a file, using backup_open
+    """
+    new_filename = path.join(directory, "{}.pickle".format(filename))
+    gc.disable()
+    with backup_open(new_filename) as infile:
+        obj = pickle.load(infile)
+    gc.enable()
+    return obj
