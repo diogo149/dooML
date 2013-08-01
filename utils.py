@@ -24,12 +24,15 @@
     -fit_predict
     -kfold_feature_scorer
     -machine_score_func
+    -primes_to
+    -is_prime
 
 """
 from __future__ import print_function
 import numpy as np
 import pandas as pd
 import random
+import math
 
 from pdb import set_trace
 from datetime import datetime
@@ -262,3 +265,30 @@ def machine_score_func(clf, X, y, X_test, y_test, metric):
     new_clf.fit(X, y)
     predictions = new_clf.predict(X_test)
     return metric(y_test, predictions)
+
+
+def primes_to(n):
+    # http://stackoverflow.com/questions/2068372/fastest-way-to-list-all-primes-below-n-in-python/3035188#3035188
+    """ Input n>=6, Returns a array of primes, 2 <= p < n """
+    if n < 6:
+        return [i for i in [2, 3, 5] if i <= n]
+    sieve = np.ones(n / 3 + (n % 6 == 2), dtype=np.bool)
+    sieve[0] = False
+    for i in xrange(int(n ** 0.5) / 3 + 1):
+        if sieve[i]:
+            k = 3 * i + 1 | 1
+            sieve[((k * k) / 3)::2 * k] = False
+            sieve[(k * k + 4 * k - 2 * k * (i & 1)) / 3::2 * k] = False
+    return np.r_[2, 3, ((3 * np.nonzero(sieve)[0] + 1) | 1)]
+
+
+def is_prime(n):
+    """ returns True if N is a prime number, False otherwise
+    """
+    if n != int(n) or n <= 1:
+        return False
+    upper_bound = int(np.sqrt(n))
+    for p in primes_to(upper_bound):
+        if n % p == 0:
+            return False
+    return True

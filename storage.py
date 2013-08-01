@@ -14,6 +14,7 @@
     -backup_open
     -quick_save2
     -quick_load2
+    -quick_write2
 
 """
 import gc
@@ -170,3 +171,12 @@ def quick_load2(directory, filename):
         obj = pickle.load(infile)
     gc.enable()
     return obj
+
+
+def quick_write2(directory, filename, obj):
+    """ quickly write an object as a string to a file
+    """
+    try_mkdir(directory)
+    new_filename = path.join(directory, "{}.txt".format(filename))
+    with backup_open(new_filename, 'w') as outfile:
+        outfile.write(str(obj))
