@@ -1,6 +1,9 @@
 """Table of Contents
     -parmap
     -pipe_parmap
+    -parfor
+    -random_parmap_helper
+    -random_parmap
 """
 
 import multiprocessing
@@ -67,3 +70,13 @@ def parfor(func, num_times, args=[], kwargs={}, n_jobs=1):
         random_seed(i)
         return func(*args, **kwargs)
     return pipe_parmap(wrapped, range(num_times), n_jobs=n_jobs)
+
+
+def random_parmap_helper(func, args, kwargs, item):
+    idx, in_val = item
+    random_seed(idx)
+    return func(in_val, *args, **kwargs)
+
+
+def random_parmap(func, in_vals, args=[], kwargs={}, n_jobs=1):
+    return parmap(random_parmap_helper, zip(range(len(in_vals)), in_vals), [func, args, kwargs], n_jobs=n_jobs)
