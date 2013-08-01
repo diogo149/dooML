@@ -188,6 +188,9 @@ class Trial(SingletonContextManagerObject):
     def train_mode(self):
         return self.train_mode
 
+    def filename(self):
+        return self.filename
+
 
 class FeatureCache(object):
 
