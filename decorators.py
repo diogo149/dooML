@@ -80,7 +80,7 @@ def timer(func):
     def wrapped(*args, **kwargs):
         start_time = time()
         output = func(*args, **kwargs)
-        print("Function {} took {} seconds.".format(func_name(func, time() - start_time))
+        print("Function {} took {} seconds.".format(func_name(func), time() - start_time))
         return output
 
     wrapped.func_name = func_name(func)
