@@ -144,13 +144,8 @@ def backup_open(filename, flag='r', num=2):
     assert flag in 'war'
     filenames = related_filenames(filename, num)
     times = map(modified_time, filenames)
-    try:
-        idx = times.index(None)
-    except ValueError:
-        if flag == 'r':
-            idx = max(range(num), key=lambda x: times[x])
-        else:
-            idx = min(range(num), key=lambda x: times[x])
+    indices = sorted(range(num), key=lambda x: times[x])
+    idx = indices[-1] if flag == 'r' else indices[0]
     new_filename = filenames[idx]
     return open(new_filename, flag)
 
