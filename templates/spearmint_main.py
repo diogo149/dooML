@@ -1,5 +1,3 @@
-import numpy as np
-
 from utils import spearmint_params, random_seed, quick_cv, fit_predict
 from storage import quick_load
 
@@ -16,7 +14,6 @@ def main_func(params):
         X_test = quick_load(".", "???")
         y_test = quick_load(".", "???")
         return score_func(y_test, fit_predict(X, y, X_test, cache=True))
-
     else:  # using CV
         return quick_cv(clf, X, y, score_func, n_folds=10, check_folds=1)
 
