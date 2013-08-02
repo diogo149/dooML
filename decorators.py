@@ -13,6 +13,9 @@ from time import time
 import SETTINGS
 from pdb import set_trace
 
+# these are imported so that they can be imported from this file
+from helper.humanize import humanize
+
 
 def func_name(func):
     try:
