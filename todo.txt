@@ -5,7 +5,7 @@ sampling_machine
     -make parallel
 
 classes
-    -near zero variance filter
+    -near zero variance filter (make sure to save which rows are removed w/ fit & transform)
 
 binning_machine
     -predict_proba
@@ -34,5 +34,5 @@ to make:
     -spearmint-lite wrapper
         -ability to add / remove runs manually
         -compile with Cython
-    -multiprocess locking (using a file, like spearmint)
+    -par_quick_save / par_quick_load / par_quick_write
     -qsave / qload / qsave / qload / qwrite / qread (no need directory)

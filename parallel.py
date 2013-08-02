@@ -30,7 +30,7 @@ def parmap(func, in_vals, args=[], kwargs={}, n_jobs=1):
     return mapped
 
 
-def pipe_parmap(func, X, n_jobs=multiprocessing.cpu_count()):
+def pipe_parmap(func, X, n_jobs=1):
     """ alternative parallel map
 
     source: http://stackoverflow.com/questions/3288595/multiprocessing-using-pool-map-on-a-function-defined-in-a-class
@@ -46,6 +46,9 @@ def pipe_parmap(func, X, n_jobs=multiprocessing.cpu_count()):
 
     if n_jobs == 1:
         return map(func, X)
+    elif n_jobs == -1:
+        n_jobs = multiprocessing.cpu_count()
+
     q_in = multiprocessing.Queue(1)
     q_out = multiprocessing.Queue()
 

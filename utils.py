@@ -26,21 +26,32 @@
     -machine_score_func
     -primes_to
     -is_prime
+    -extract_output
+    -spearmint_params
+    -quick_cv
+    -grouper
+    -quick_score
+    -feature_bitmask
+    -bitmask_score_func
 
 """
 from __future__ import print_function
 import numpy as np
 import pandas as pd
 import random
+import re
+import itertools
 
 from pdb import set_trace
 from datetime import datetime
 from copy import deepcopy
+from subprocess import check_output
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.cross_validation import KFold
+from sklearn.cross_validation import KFold, StratifiedKFold
 
 import SETTINGS
 from decorators import default_catcher
+from storage import machine_cache
 
 debug = set_trace
 
@@ -239,11 +250,14 @@ def args_expander(func, item):
     return func(*item)
 
 
-def fit_predict(clf, X, y, X_test):
+def fit_predict(clf, X, y, X_test, cache=False):
     """ makes a copy of a machine, then fits it on training data and predicts on test data. useful for parallel maps.
     """
     tmp_clf = deepcopy(clf)
-    tmp_clf.fit(X, y)
+    if cache:
+        tmp_clf = machine_cache(smart_hash(X), tmp_clf, X, y)
+    else:
+        tmp_clf.fit(X, y)
     return tmp_clf.predict(X_test)
 
 
@@ -257,12 +271,10 @@ def kfold_feature_scorer(num_features, score_func, k=2):
     return result
 
 
-def machine_score_func(clf, X, y, X_test, y_test, metric):
+def machine_score_func(clf, X, y, X_test, y_test, metric, cache=False):
     """ returns the score of a specific machine on a specific dataset with a specific metric
     """
-    new_clf = deepcopy(clf)
-    new_clf.fit(X, y)
-    predictions = new_clf.predict(X_test)
+    predictions = fit_predict(clf, X, y, X_test, cache=cache)
     return metric(y_test, predictions)
 
 
@@ -291,3 +303,78 @@ def is_prime(n):
         if n % p == 0:
             return False
     return True
+
+
+def extract_output(cmd_list, pattern):
+    """ performs a search for a pattern in the stdout of a command and returns a list of all matches
+    """
+    output = check_output(cmd_list)
+    return re.findall(pattern, output)
+
+
+def spearmint_params(params):
+    """ process input params from spearmint by extracting elements from one element lists and transforming logged input
+    """
+    for key in params.keys():
+        if len(params[key]) == 1:
+            params[key] = params[key][0]
+            if key.startswith('log_'):
+                params[key[4:]] = exp(params[key])
+                params.pop(key)
+    return params
+
+
+def quick_cv(clf, X, y, score_func, stratified=False, n_folds=10, checked_folds=1):
+    """ returns the score of one (or more) fold(s) of cross validation, for quickly getting a score
+    """
+    if stratified:
+        cv = StratifiedKFold(y, n_folds=n_folds)
+    else:
+        cv = KFold(y.shape[0], n_folds=n_folds, shuffle=True)
+    scores = []
+    for train, test in cv:
+        X_train, X_test = X[train], X[test]
+        y_train, y_test = y[train], y[test]
+        scores.append(score_func(y_test, fit_predict(clf, X_train, y_train, X_test)))
+        if len(scores) >= checked_folds:
+            break
+    return sum(scores) / float(len(scores))
+
+
+def grouper(n, iterable, fillvalue=None):
+    """ groups an iterable into chunks of a certain size
+    >>> grouper(3, 'ABCDEFG', 'x')
+    ABC DEF Gxx
+
+    from: http://stackoverflow.com/questions/1624883/alternative-way-to-split-a-list-into-groups-of-n
+    """
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(*args, fillvalue=fillvalue)
+
+
+def quick_score(clf, X, y, score_func, cv=True, X_test=None, y_test=None, cache=False, stratified=False, n_folds=10, checked_folds=1):
+    """ all in one scoring function that can handle both cross validation and an external validation set
+    """
+    if cv:
+        return quick_cv(clf, X, y, score_func=score_func, stratified=stratified, n_folds=n_folds, checked_folds=checked_folds)
+    else:
+        return score_func(y_test, fit_predict(X, y, X_test, cache=cache))
+
+
+def feature_bitmask(X, bitmask):
+    """ keeps only columns of a 2D numpy array corresponding to the input bitmask
+    """
+    return X[:, np.where(bitmask)[0]]
+
+
+def bitmask_score_func(clf, X, y, score_func, cv=True, X_test=None, y_test=None, cache=False, stratified=False, n_folds=10, checked_folds=1):
+    """ returns a function that takes in a bitmask and returns it's respective score
+    """
+    def wrapped(bitmask):
+        new_X = feature_bitmask(X, bitmask)
+        if X_test is not None:
+            new_X_test = feature_bitmask(X_test, bitmask)
+        else:
+            new_X_test = None
+        return quick_score(clf=clf, X=new_X, y=y, score_func=score_func, cv=cv, X_test=new_X_test, y_test=y_test, cache=cache, stratified=stratified, n_folds=n_folds, checked_folds=checked_folds)
+    return wrapped

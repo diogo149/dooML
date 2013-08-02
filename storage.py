@@ -61,8 +61,8 @@ def filename(*args):
     else:
         raise Exception
     if extension:
-        extension = "." + extension
-    return path.join(directory, filename + extension)
+        extension = ".{}".format(extension)
+    return path.join(directory, "{}{}".format(basename, extension))
 
 
 def quick_exists(directory, basename, extension):
