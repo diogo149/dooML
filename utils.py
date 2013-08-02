@@ -358,7 +358,7 @@ def quick_score(clf, X, y, score_func, cv=True, X_test=None, y_test=None, cache=
     if cv:
         return quick_cv(clf, X, y, score_func=score_func, stratified=stratified, n_folds=n_folds, checked_folds=checked_folds)
     else:
-        return score_func(y_test, fit_predict(X, y, X_test, cache=cache))
+        return score_func(y_test, fit_predict(clf, X, y, X_test, cache=cache))
 
 
 def feature_bitmask(X, bitmask):
