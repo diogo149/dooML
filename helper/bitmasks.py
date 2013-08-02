@@ -80,7 +80,7 @@ def bitmask_generation(bitmasks, history, bits, size=32, avg_mutations=100, chil
     return generation
 
 
-def bitmask_genetic_algorithm(bits, score_func, history=None, gene_pool=None, epochs=100, population_size=32, avg_mutations=100, child_rate=0.5, n_jobs=1):
+def bitmask_genetic_algorithm(bits, score_func, history=None, gene_pool=None, epochs=100, population_size=32, avg_mutations=100, child_rate=0.5, n_jobs=1, verbose=False):
     """ genetic algorithm that MAXIMIZES the value of the input scoring function
     """
     if history is None:
@@ -95,4 +95,6 @@ def bitmask_genetic_algorithm(bits, score_func, history=None, gene_pool=None, ep
             gene_pool.push(item)
         quick_save2("bitmask_genetic_algorithm", "gene_pool", gene_pool)
         quick_save2("bitmask_genetic_algorithm", "history", history)
+        if verbose:
+            print "Completed epoch: {}\t Best score: {}".format(i, max([x[0] for x in gene_pool.to_list()]))
     return gene_pool
