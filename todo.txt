@@ -31,3 +31,8 @@ to make:
             -min time between occurences
             -etc ?
         -use sklearn.semi_supervised for imputation
+    -spearmint-lite wrapper
+        -ability to add / remove runs manually
+        -compile with Cython
+    -multiprocess locking (using a file, like spearmint)
+    -qsave / qload / qsave / qload / qwrite / qread (no need directory)

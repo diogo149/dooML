@@ -32,7 +32,6 @@ from __future__ import print_function
 import numpy as np
 import pandas as pd
 import random
-import math
 
 from pdb import set_trace
 from datetime import datetime
