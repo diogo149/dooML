@@ -10,11 +10,11 @@
 
     -decorate_fit
     -decorate_transform
-    -decorate_trns
-    -memmap_trns
-    -timer_trns
-    -log_trns
-    -trace_error_trns
+    -decorate_trn
+    -memmap_trn
+    -timer_trn
+    -log_trn
+    -trace_error_trn
 
     -humanize
 """
@@ -184,34 +184,34 @@ def decorate_transform(decorator, trn):
     return trn
 
 
-def decorate_trns(decorator, trn):
+def decorate_trn(decorator, trn):
     """ applies a decorator to both the fit and transform methods of a transform
     """
     return decorate_fit(decorator, decorate_transform(decorator, trn))
 
 
-def memmap_trns(trn):
+def memmap_trn(trn):
     """ Temporarily memmaps the X and y values. Useful for saving memory during parallel computation.
     """
-    return decorate_trns(decorators.memmap, trn)
+    return decorate_trn(memmap, trn)
 
 
-def timer_trns(trn):
+def timer_trn(trn):
     """ Times fit and transform methods
     """
-    return decorate_trns(decorators.timer, trn)
+    return decorate_trn(timer, trn)
 
 
-def log_trns(trn):
+def log_trn(trn):
     """ logs input and output of fit and transform methods
     """
-    return decorate_trns(decorators.log, trn)
+    return decorate_trn(log, trn)
 
 
-def trace_error_trns(trn):
+def trace_error_trn(trn):
     """ starts the python debugger if an exception is thrown in the fit or transform methods
     """
-    return decorate_trns(decorators.trace_error, trn)
+    return decorate_trn(trace_error, trn)
 
 
 if __name__ == "__main__":

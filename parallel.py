@@ -4,20 +4,28 @@
     -parfor
     -random_parmap_helper
     -random_parmap
+    -joblib_parmap
+    -joblib_run
 """
 
 import multiprocessing
-from functools import partial
 
+from functools import partial
+from joblib import Parallel, delayed
+
+import SETTINGS
 from utils import random_seed
 
 
-def parmap(func, in_vals, args=[], kwargs={}, n_jobs=1):
+def parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
     """ easy parallel map, but it pickles input arguments and thus can't be used for dynamically generated functions.
     """
     assert isinstance(n_jobs, int)
     assert n_jobs >= -1
-    new_func = partial(func, *args, **kwargs)
+    if args or kwargs:
+        new_func = partial(func, *args, **kwargs)
+    else:
+        new_func = func
     if n_jobs == 1:
         mapped = map(new_func, in_vals)
     else:
@@ -66,7 +74,7 @@ def pipe_parmap(func, X, n_jobs=1):
     return [x for i, x in sorted(res)]
 
 
-def parfor(func, num_times, args=[], kwargs={}, n_jobs=1):
+def parfor(func, num_times, args=(), kwargs={}, n_jobs=1):
     """ run a function multiple times with the same input in parallel
     """
     def wrapped(i):
@@ -76,10 +84,28 @@ def parfor(func, num_times, args=[], kwargs={}, n_jobs=1):
 
 
 def random_parmap_helper(func, args, kwargs, item):
+    """ helper method for random_parmap
+    """
     idx, in_val = item
     random_seed(idx)
     return func(in_val, *args, **kwargs)
 
 
-def random_parmap(func, in_vals, args=[], kwargs={}, n_jobs=1):
+def random_parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
+    """ parallel map with different random seeds for each value
+    """
     return parmap(random_parmap_helper, zip(range(len(in_vals)), in_vals), [func, args, kwargs], n_jobs=n_jobs)
+
+
+def joblib_parmap(func, generator, *args, **kwargs):
+    """ parallel map using joblib, but it pickles input arguments and thus can't be used for dynamically generated functions.
+    """
+    new_func = delayed(partial(func, *args, **kwargs) if args or kwargs else func)
+    return joblib_run(new_func(item) for item in generator)
+
+
+def joblib_run(delayed_generator):
+    """ runs a generator of joblib tasks
+    NOTE: the functions run do not have to be homogeneous, you can make arbitrary generators with whatever functions as long as they are pickle-able
+    """
+    return Parallel(n_jobs=SETTINGS.PARALLEL.JOBS, verbose=SETTINGS.PARALLEL.JOBLIB_VERBOSE, pre_dispatch=SETTINGS.PARALLEL.JOBLIB_PRE_DISPATCH)(delayed_generator)

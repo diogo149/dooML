@@ -49,9 +49,9 @@ to make:
             -% letters
         -use sklearn.semi_supervised for imputation
     -spearmint-lite wrapper
+        -ability to record all runs for visualization / analysis (use sqlite)
         -ability to add / remove runs manually
         -compile with Cython
-        -ability to record all runs for visualization / analysis
         -plot function that shows heat map for each pair of hyperparameters
     -par_quick_save / par_quick_load / par_quick_write
     -qsave / qload / qsave / qload / qwrite / qread (no need directory)

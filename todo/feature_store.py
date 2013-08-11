@@ -5,20 +5,15 @@
     -FeatureDB
 
 implementation notes:
-    -store nodes with same name in same file with backup open or equivalent with joblib
     -need ability to draw / list tree (?)
-    -for node file, keep:
-        -fit_time
-        -transformer
-        -loss (if "prediction" in tags)
-    -CV transform
 """
 
 import sqlite3
 
 import SETTINGS
-from utils import all_iterable, random_seed, bool_to_int
+from utils import all_iterable, random_seed, bool_to_int, memmap_hstack
 from storage import joblib_load, joblib_save
+from utils2 import cv_fit_transform
 
 
 class FeatureStore(object):
@@ -61,7 +56,7 @@ class FeatureStore(object):
         """
         return self.db.node(node_id)
 
-    def prune_independent_of_id(self, id):
+    def prune_independent_of_id(self, node_id):
         """ removes the data stored on disk of all nodes not an ancestor of node with input id
         """
         # TODO
@@ -70,33 +65,92 @@ class FeatureStore(object):
         """ TODO ??? how do i do this
         """
 
-    def find_children(self, id):
+    def find_children(self, node_id):
         """ returns the children of the input id
         """
         # TODO
 
-    def find_parents(self, id):
-        """ returns the parents of the input id
+    def query_dependencies(self, dep):
+        """ find a set of parent ids for a dependency
         """
-        # TODO make find_parents (to find ids) db function and batch_label function (to convert ids to labels efficiently)
+        parent_ids = set(map(self.node_id, dep.parent_labels))
+        exclude_ids = set(map(self.node_id, dep.exclude_labels))
+        tag_parent_ids = set(map(self.query_tag, dep.parent_tags))
+        tag_exclue_ids = set(map(self.query_tag, dep.exclude_tags))
+        return sorted((tag_parent_ids - tag_exclue_ids - exclude_ids) | parent_ids)
+
+    def dependency_nodes(self, dep):
+        """ returns dependency nodes for a dependency
+        """
+        dep_ids = self.query_dependencies(dep)
+        return [self.node(dep_id) for dep_id in dep_ids]
+
+    def fit_transform(self, node, data_name=None):
+        """ get the output of this feature for the training data
+        """
+        output = node.load_field(data_name, "__OUTPUT__")
+        if output is None:
+            X_nodes = self.dependency_nodes(node.X)
+            X_data = [self.fit_transform(X_node, data_name)[0] for X_node in X_nodes]
+            y_nodes = self.dependency_nodes(node.y)
+            y_data = [self.fit_transform(y_node, data_name)[0] for y_node in y_nodes]
+
+            X = memmap_hstack(X_data)
+            if not y_data:
+                y = None
+            else:
+                y = memmap_hstack(y_data)
+
+            trn = node.load_field(fit_data_name, "__FIT_TRN__")
+            if trn is None:
+                random_seed(node.index)
+                node.trn.fit(X, y)
+                if node.cache:
+                    node.save_field(data_name, "__FIT_TRN__", node.trn)
+            else:
+                node.trn = trn
+
+            random_seed(node.index)
+            output = cv_fit_transform(trn, X, y, stratified=node.stratified, n_folds=SETTINGS.FEATURE_STORE.CV_FOLDS)  # FIXME stratified
+            if node.cache_output:
+                node.save_field(data_name, "__OUTPUT__", output)
+        return output, node.trn
+
+    def transform(self, node, data_name=None, fit_data_name=None):
+        """ get the output of this feature for the data corresponding to data_name
+        """
+        output = node.load_field(data_name, "__OUTPUT__")
+        if output is None:
+            X_nodes = self.dependency_nodes(node.X)
+            X_data = [self.transform(X_node, data_name)[0] for X_node in X_nodes]
+            X = memmap_hstack(X_data)
+
+            trn = node.load_field(fit_data_name, "__FIT_TRN__")
+            if trn is None:
+                _, trn = self.fit_transform(node, fit_data_name)
+
+            random_seed(node.index)
+            output = trn.transform(X)
+            if node.cache_output:
+                node.save_field(data_name, "__OUTPUT__", output)
+        return output
 
     def input_node(self, data, name, tags=('raw', 'input'), data_name=None):
         if data_name is None:
             data_name = SETTINGS.FEATURE_STORE.DATA_NAME
-        node = self.add(FeatureNode(name, None, tags=tags, X=FeatureDependency(), y=FeatureDependency(), cache=True, cache_output=True))
-        node.save_field(data_name, "output", data)
+        node = self.add(FeatureNode(name, None, tags=tags, X=FeatureDependency(), y=FeatureDependency(), cache=True, cache_output=True, stratified=False))
+        node.save_field(data_name, "__OUTPUT__", data)
         return node
 
 
 class FeatureNode(object):
 
-    def __init__(self, label, trn, tags, X, y, cache=True, cache_output=True):
+    def __init__(self, label, trn, tags, X, y, cache=True, cache_output=True, stratified=False, node_id=None):
         """
         warning: for user created nodes, have label be a string
 
         assumptions:
             -numbers fit in 32 bit float
-            -if not cache and cache_output, output still isn't cached
         """
         self.basename, self.index = FeatureNode.parse_label(label)
         self.trn = trn
@@ -105,30 +159,13 @@ class FeatureNode(object):
         self.y = y
         self.cache = cache
         self.cache_output = cache_output
-
-    def fit_transform(self, data_name=None):
-        """ get the output of this feature for the training data
-        """
-        assert self.index is not None  # ???
-        # if output doesnt exist
-        # finds parents and calls to get their output
-        # FIXME
-        # auto memmap
-        # auto CV
-        # auto parallelize
-        random_seed(self.index)
-
-    def transform(self, data_name=None, fit_data_name=None):
-        """ get the output of this feature for the data corresponding to data_name
-        """
-        # if transform doesn't exist
-        # find parents and calls to get their output
-        # FIXME
-        # try to parallelize this?
+        self.stratified = stratified
+        self.node_id = node_id
 
     def save_field(self, data_name, field, value):
         """ saves a field corresponding to this node
         """
+        assert self.index is not None
         if data_name is None:
             data_name = SETTINGS.FEATURE_STORE.DATA_NAME
         try:
@@ -149,24 +186,31 @@ class FeatureNode(object):
         try:
             data = joblib_load(data_name, self.basename)[self.index]
             return data[field]
-        except:
+        except:  # IOError, KeyError
             return None
-
-    def save_transform(self, data_name=None):
-        """ saves the transform to a file
-        """
-        return self.save_field(data_name, "raw_trn", self.trn)
-
-    def load_transform(self, data_name=None):
-        """ loads the transform from a file
-        """
-        self.trn = self.load_field(data_name, "raw_trn")
-        return self.trn
 
     def prune_id(self):
         """ removes the data stored on disk for this node
         """
-        # TODO
+        if data_name is None:
+            data_name = SETTINGS.FEATURE_STORE.DATA_NAME
+        try:
+            basename_data = joblib_load(data_name, self.basename)
+            result = basename_data.pop(self.index)
+            joblib_save(data_name, self.basename, basename_data)
+        except:  # IOError, KeyError
+            pass
+
+    def save_transform(self, data_name=None):
+        """ saves the transform to a file
+        """
+        return self.save_field(data_name, "__RAW_TRN__", self.trn)
+
+    def load_transform(self, data_name=None):
+        """ loads the transform from a file
+        """
+        self.trn = self.load_field(data_name, "__RAW_TRN__")
+        return self.trn
 
     @staticmethod
     def parse_label(label):
@@ -209,6 +253,7 @@ class FeatureNode(object):
         assert all_iterable(node.tags, FeatureNode.valid_name)
         FeatureDependency.verify_dependency(node.X)
         FeatureNode.verify_dependency(node.y)
+        assert node.node_id is None or (isinstance(node.node_id, int) and node.node_id > 0)
 
 
 class FeatureDependency(object):
@@ -231,13 +276,6 @@ class FeatureDependency(object):
         """
         return FeatureDependency(self.parent_labels & other.parent_labels, self.parent_tags & other.parent_tags, self.exclude_labels & other.exclude_labels, self.exclude_tags & other.exclude_tags)
 
-    def expand(self, node_id):
-        """ creates a FeatureDependency where all the tags and excluded dependencies are converted into exact parent names
-        """
-        tmp = set(self.parent_labels)
-        # TODO
-        return tmp
-
     @staticmethod
     def verify_dependency(dep):
         """ AssertionError if dependency has invalid field
@@ -258,7 +296,7 @@ class FeatureDependency(object):
 class FeatureDB(object):
 
     TABLES = (
-        ('NODES', 'NAME_ID INTEGER, CACHE INTEGER, CACHE_OUTPUT INTEGER'),
+        ('NODES', 'NAME_ID INTEGER, CACHE INTEGER, CACHE_OUTPUT INTEGER, STRATIFIED INTEGER'),
         ('NODE_TAGS', 'ID INTEGER, TAG_ID INTEGER'),
         ('PARENTS', 'ID INTEGER, PARENT_ID INTEGER'),
         ('EXCLUDE', 'ID INTEGER, EXCLUDE_ID INTEGER'),
@@ -353,8 +391,9 @@ class FeatureDB(object):
         """ add each part of the node to the database and update the node's index
         """
         basename_id = self.basename_id(node.basename)
-        self.insert('NODES', (basename_id, bool_to_int(node.cache), bool_to_int(node.cache_output)))
+        self.insert('NODES', (basename_id, bool_to_int(node.cache), bool_to_int(node.cache_output), bool_to_int(node.stratified)))
         node_id = self.last_insert_rowid()
+        node.node_id = node_id
         for tag_id in map(self.tag_id, node.tags):
             self.insert('NODE_TAGS', (node_id, tag_id))
         self.add_dependency(node_id, '', node.X)
@@ -366,7 +405,7 @@ class FeatureDB(object):
     def node(self, node_id):
         """ returns a FeatureNode given a node id
         """
-        basename_id, cache, cache_output = self.select('NODES', '*', ('ROWID', node_id))
+        basename_id, cache, cache_output, stratified = self.select('NODES', '*', ('ROWID', node_id))
         index = self.node_index(node_id, basename_id)
         basename = self.basename(basename_id)
         label = (basename, index)
@@ -374,7 +413,7 @@ class FeatureDB(object):
         tags = [self.tag(tag_id) for tag_id in tag_ids]
         X = self.dependency(node_id, '')
         y = self.dependency(node_id, '2')
-        node = FeatureNode(label, None, tags, X, y, cache, cache_output)
+        node = FeatureNode(label, None, tags, X, y, cache, cache_output, stratified, node_id)
         node.load_transform()
         return node
 

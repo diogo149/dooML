@@ -49,6 +49,7 @@ class GenericTransform(GenericObject):
         GenericTransform._verify1(X)
         transformed = self._transform(X)
         GenericTransform._verify2(X, transformed, result=True)
+        return transformed
 
     def _transform(self, X):
         pass

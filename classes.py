@@ -38,7 +38,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 
 from storage import quick_write, quick_save, quick_load, quick_exists, machine_cache
-from utils import is_categorical, hash_df, smart_hash, random_seed
+from utils import is_categorical, smart_hash, random_seed
 from utils2 import cv_fit_predict
 from helper import gap_statistic
 
@@ -247,16 +247,6 @@ class MachineCache(GenericObject):
             self.hashes.append("{}_{}".format(smart_hash(X), smart_hash(y)))
         filename = self.hashes[idx]
         return machine_cache(filename, clf, X, y)
-
-
-class PredictReshaper(TransformWrapper):
-
-    """ Wraps a machine so that it's predict method returns a 2D array with a specified number of columns (defualt=1).
-    """
-    _default_args = {'predict_cols': 1, }
-
-    def predict(self, *args, **kwargs):
-        return self.clf.predict(*args, **kwargs).reshape(-1, self.predict_cols)
 
 
 class NumericalToCategorical(GenericObject):

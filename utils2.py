@@ -9,8 +9,8 @@ import numpy as np
 
 from sklearn.cross_validation import StratifiedKFold, KFold
 
-from utils import fit_predict, args_expander, kfold_feature_scorer, machine_score_func
-from parallel import parmap, parfor
+from utils import fit_predict, fit_transform, args_expander, kfold_feature_scorer, machine_score_func
+from parallel import parmap, parfor, joblib_parmap
 
 
 def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
@@ -24,6 +24,21 @@ def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
     for (_, test_idx), vals in zip(kfold, mapped):
         prediction[test_idx] = vals
     return prediction
+
+
+def cv_fit_transform(trn, X, y=None, stratified=False, n_folds=3):
+    """ return cross-validated transform features
+    """
+    rows = X.shape[0]
+    kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(rows, n_folds, shuffle=True))
+    print kfold
+    items = ((trn, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold)
+    mapped = joblib_parmap(args_expander, items, fit_transform)
+    transformed = [None] * rows
+    for (_, test_idx), vals in zip(kfold, mapped):
+        for idx, val in zip(test_idx, vals):
+            transformed[idx] = val
+    return np.array(transformed)
 
 
 def multi_feature_scorer(num_features, score_func, n_iter=20, k=2, n_jobs=1):
@@ -42,3 +57,12 @@ def machine_feature_scorer(clf, X, y, X_test, y_test, metric, n_iter=20, k=2, n_
 
     num_features = X.shape[1]
     return multi_feature_scorer(num_features, score_func, n_iter, k, n_jobs)
+
+if __name__ == "__main__":
+    from sklearn.linear_model import LogisticRegression
+    from transform import SklearnBridge
+    X = np.random.randn(100, 100)
+    y = np.random.randint(0, 2, size=(100, 1))
+    trn = SklearnBridge(clf=LogisticRegression())
+    p = cv_fit_transform(trn, X, y)
+    print (((p[:, 1] > 0.5) + 0).reshape(-1, 1) == y).sum()

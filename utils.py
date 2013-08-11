@@ -17,6 +17,7 @@
     -add_index_to_columns
     -args_expander
     -fit_predict
+    -fit_transform
     -kfold_feature_scorer
     -machine_score_func
     -primes_to
@@ -34,6 +35,8 @@
     -all_iterable
     -all_isinstance
     -bool_to_int
+    -to_memmap
+    -memmap_hstack
 
 """
 from __future__ import print_function
@@ -43,6 +46,7 @@ import joblib
 import random
 import re
 import itertools
+import tempfile
 
 from math import exp, sqrt, log
 from pdb import set_trace
@@ -217,6 +221,14 @@ def fit_predict(clf, X, y, X_test, cache=False):
     return tmp_clf.predict(X_test)
 
 
+def fit_transform(trn, X, y, X_test):
+    """ makes a copy of a transform, then fits it on training data and predicts on test data. useful for parallel maps.
+    """
+    temp_trn = deepcopy(trn)
+    temp_trn.fit(X, y)
+    return temp_trn.transform(X_test)
+
+
 def kfold_feature_scorer(num_features, score_func, k=2):
     """ returns the average scores for datasets with each feature, given a scoring function
     """
@@ -344,7 +356,7 @@ def flexible_int_input(in_val, size):
     elif isinstance(in_val, float) and 0 < in_val <= 1.0:
         return int(round(in_val * size))
     elif isinstance(in_val, int) and in_val > 1:
-        return min(rows, in_val)
+        return min(size, in_val)
     elif in_val == "sqrt":
         return int(round(sqrt(size)))
     elif in_val == "log2":
@@ -386,3 +398,35 @@ def bool_to_int(boolean):
     """ integer equivalent to boolean
     """
     return 1 if boolean else 0
+
+
+def to_memmap(X):
+    """ returns a memmap of the input numpy array
+    """
+    dtype = arg.dtype if SETTINGS.UTILS.MEMMAP_DTYPE is None else SETTINGS.UTILS.MEMMAP_DTYPE
+    with tempfile.TemporaryFile() as infile:
+        memmapped = np.memmap(infile, dtype=dtype, shape=X.shape)
+    memmapped[:] = X
+    return memmapped
+
+
+def memmap_hstack(Xs):
+    """ returns a memmapped hstack of input arrays in a memory efficient manner
+    """
+    shapes = [X.shape for X in Xs]
+    assert all_iterable(shapes, lambda x: len(x) == 2), "input array is not 2D"
+    columns, rows = zip(*shapes)
+    assert min(columns) == max(columns), "input does not have same number of columns"
+
+    total_columns = columns[0]
+    total_rows = sum(rows)
+    dtype = np.float if SETTINGS.UTILS.MEMMAP_DTYPE is None else SETTINGS.UTILS.MEMMAP_DTYPE
+    with tempfile.TemporaryFile() as infile:
+        memmapped = np.memmap(infile, dtype=dtype, shape=(total_columns, total_rows))
+
+    offset = 0
+    for X in Xs:
+        row = X.shape[0]
+        memmapped[:, offset:offset + row] = X
+        offset += row
+    return memmapped
