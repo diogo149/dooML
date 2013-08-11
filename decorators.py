@@ -6,12 +6,27 @@
     -timer
     -trace_error
     -ignore_args
+    -memmap
+
+    -decorate_fit
+    -decorate_transform
+    -decorate_trns
+    -memmap_trns
+    -timer_trns
+    -log_trns
+    -trace_error_trns
+
+    -humanize
 """
 
 from __future__ import print_function
+import numpy as np
+
 from time import time
-import SETTINGS
 from pdb import set_trace
+from tempfile import TemporaryFile
+
+import SETTINGS
 
 # these are imported so that they can be imported from this file
 from helper.humanize import humanize
@@ -114,6 +129,90 @@ def ignore_args(func):
 
     wrapped.func_name = func_name(func)
     return wrapped
+
+
+def memmap(func):
+    """ converts numpy array inputs into memmaps. useful for parallelization.
+    """
+
+    def memmap_and_tmp_file(arg):
+        tmp_file = TemporaryFile()
+        dtype = arg.dtype if SETTINGS.DECORATORS.MEMMAP_DTYPE is None else SETTINGS.DECORATORS.MEMMAP_DTYPE
+        new_np = np.memmap(tmp_file, dtype=dtype, shape=arg.shape)
+        new_np[:] = arg[:]
+        return new_np, tmp_file
+
+    def wrapped(*args, **kwargs):
+        tmp_files = []
+        try:
+            new_args = []
+            new_kwargs = {}
+            for arg in args:
+                if isinstance(arg, np.ndarray):
+                    new_np, tmp_file = memmap_and_tmp_file(arg)
+                    tmp_files.append(tmp_file)
+                    new_args.append(new_np)
+                else:
+                    new_args.append(arg)
+            for k, v in kwargs.items():
+                if isinstance(v, np.npdarray):
+                    new_np, tmp_file = memmap_and_tmp_file(v)
+                    tmp_files.append(tmp_file)
+                    new_kwargs[k] = new_np
+                else:
+                    new_kwargs[k] = v
+            return func(*new_args, **new_kwargs)
+        finally:
+            for tmp_file in tmp_files:
+                tmp_file.close()
+
+    wrapped.func_name = func_name(func)
+    return wrapped
+
+
+def decorate_fit(decorator, trn):
+    """ applies a decorator to the fit method of a transform
+    """
+    trn.fit = decorator(trn.fit)
+    return trn
+
+
+def decorate_transform(decorator, trn):
+    """ applies a decorator to the transform method of a transform
+    """
+    trn.transform = decorator(trn.transform)
+    return trn
+
+
+def decorate_trns(decorator, trn):
+    """ applies a decorator to both the fit and transform methods of a transform
+    """
+    return decorate_fit(decorator, decorate_transform(decorator, trn))
+
+
+def memmap_trns(trn):
+    """ Temporarily memmaps the X and y values. Useful for saving memory during parallel computation.
+    """
+    return decorate_trns(decorators.memmap, trn)
+
+
+def timer_trns(trn):
+    """ Times fit and transform methods
+    """
+    return decorate_trns(decorators.timer, trn)
+
+
+def log_trns(trn):
+    """ logs input and output of fit and transform methods
+    """
+    return decorate_trns(decorators.log, trn)
+
+
+def trace_error_trns(trn):
+    """ starts the python debugger if an exception is thrown in the fit or transform methods
+    """
+    return decorate_trns(decorators.trace_error, trn)
+
 
 if __name__ == "__main__":
     @default_catcher(3)

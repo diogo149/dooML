@@ -7,9 +7,6 @@
     -first_col
     -column_apply
     -combine_dfs
-    -hash_numpy_int
-    -hash_numpy
-    -hash_df
     -smart_hash
     -binarize
     -current_time
@@ -18,8 +15,6 @@
     -is_categorical
     -interaction_terms
     -add_index_to_columns
-    -get_no_inf_cols
-    -remove_inf_cols
     -args_expander
     -fit_predict
     -kfold_feature_scorer
@@ -33,15 +28,23 @@
     -quick_score
     -feature_bitmask
     -bitmask_score_func
+    -flexible_int_input
+    -to2d
+    -any_iterable
+    -all_iterable
+    -all_isinstance
+    -bool_to_int
 
 """
 from __future__ import print_function
 import numpy as np
 import pandas as pd
+import joblib
 import random
 import re
 import itertools
 
+from math import exp, sqrt, log
 from pdb import set_trace
 from datetime import datetime
 from copy import deepcopy
@@ -114,39 +117,10 @@ def combine_dfs(dfs):
     return pd.concat(dfs, axis=1)
 
 
-def hash_numpy_int(x):
-    """Returns int of hashed value of numpy array.
-    """
-    assert isinstance(x, np.ndarray)
-    return hash(tuple(map(to_float, x.flatten())))
-
-
-def hash_numpy(x):
-    """Returns string of hashed value of numpy array.
-    """
-    assert isinstance(x, np.ndarray)
-    return "{}_{}".format(x.shape, hash_numpy_int(x))
-
-
-def hash_df(df):
-    """Returns hashed value of pandas data frame.
-    """
-    return hash_numpy(df.as_matrix())
-
-
 def smart_hash(x):
-    """ checks the type of x and hashes appropriately. returns a string hash
+    """ returns a string hash
     """
-    if x is None:
-        return "None"
-    elif isinstance(x, pd.DataFrame):
-        return hash_df(x)
-    elif isinstance(x, np.ndarray):
-        return hash_numpy(x)
-    elif isinstance(x, (int, str, float, bool, long)):
-        return str(hash(x))
-    else:
-        raise Exception
+    return joblib.hash(x)
 
 
 def binarize(data):
@@ -224,24 +198,6 @@ def add_index_to_columns(df):
     """ adds an index number to each column of a dataframe (useful if two or more columns share a name)
     """
     return pd.DataFrame(df.as_matrix(), columns=["{}_{}".format(i, j) for i, j in enumerate(df.columns)])
-
-
-def get_no_inf_cols(x):
-    """ returns which columns do not have infinite values
-    """
-    return np.isinf(x).sum(axis=0) == 0
-
-
-def remove_inf_cols(no_inf, df):
-    """
-    Removes columns with infinite values.
-
-    Looks for infinite values twice because the columns with infinite values in the training set may be different than in the test set. (fills these values with column means)
-    """
-    assert isinstance(df, pd.DataFrame)
-    df_no_inf = df.ix[:, no_inf]
-    df_no_inf[np.isinf(df_no_inf)] = 0
-    return df_no_inf
 
 
 def args_expander(func, item):
@@ -378,3 +334,55 @@ def bitmask_score_func(clf, X, y, score_func, cv=True, X_test=None, y_test=None,
             new_X_test = None
         return quick_score(clf=clf, X=new_X, y=y, score_func=score_func, cv=cv, X_test=new_X_test, y_test=y_test, cache=cache, stratified=stratified, n_folds=n_folds, checked_folds=checked_folds)
     return wrapped
+
+
+def flexible_int_input(in_val, size):
+    """ allows for flexible input as a size
+    """
+    if in_val is None:
+        return size
+    elif isinstance(in_val, float) and 0 < in_val <= 1.0:
+        return int(round(in_val * size))
+    elif isinstance(in_val, int) and in_val > 1:
+        return min(rows, in_val)
+    elif in_val == "sqrt":
+        return int(round(sqrt(size)))
+    elif in_val == "log2":
+        return int(round(log(size) / log(2)))
+    elif in_val == "auto":
+        return size
+
+
+def to2d(x):
+    """ returns a two-dimensional array
+    """
+    if len(x.shape) == 1:
+        return x.reshape(-1, 1)
+    elif len(x.shape) == 2:
+        return x
+    else:
+        raise Exception
+
+
+def any_iterable(iterable, func):
+    """ checks if function is true for any item in iterable
+    """
+    return any(func(item) for item in iterable)
+
+
+def all_iterable(iterable, func):
+    """ checks if function is true for all items in iterable
+    """
+    return all(func(item) for item in iterable)
+
+
+def all_isinstance(iterable, t):
+    """ check if each object in an iterable is an instance of a type
+    """
+    return all_iterable(iterable, lambda x: isinstance(x, t))
+
+
+def bool_to_int(boolean):
+    """ integer equivalent to boolean
+    """
+    return 1 if boolean else 0

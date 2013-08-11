@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Setting(object):
     pass
 
@@ -16,3 +19,9 @@ QUICK_CACHE.DIRECTORY = "quick_cache"
 
 DECORATORS = Setting()
 DECORATORS.LOG = False
+DECORATORS.MEMMAP_DTYPE = np.float32
+
+FEATURE_STORE = Setting()
+FEATURE_STORE.DB = "feature.db"
+FEATURE_STORE.DEBUG_SQL = False
+FEATURE_STORE.DATA_NAME = "__TRAIN__"

@@ -6,11 +6,7 @@
     -Trial
     -FeatureCache
     -MachineCache
-    -MachineWrapper
     -PredictReshaper
-    -PrefitMachine
-    -PickleMachine
-    -SparseFiltering
     -NumericalToCategorical
     -CategoricalToNumerical
     -FittedClustering
@@ -18,9 +14,6 @@
     -fitted_kmeans
     -TransformPredictMachine
     -kmeans_linear_model
-    -MachineFactory
-    -infinity_remover
-    -ValidationFeature
     -ResidualPredicter
 
     -BinningMachine
@@ -45,9 +38,9 @@ from sklearn.linear_model import ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 
 from storage import quick_write, quick_save, quick_load, quick_exists, machine_cache
-from utils import is_categorical, hash_df, get_no_inf_cols, remove_inf_cols, fit_predict, smart_hash, random_seed
+from utils import is_categorical, hash_df, smart_hash, random_seed
 from utils2 import cv_fit_predict
-from helper import sparse_filtering, gap_statistic
+from helper import gap_statistic
 
 # these are imported so that they can be imported from this file
 from helper.binning_machine import BinningMachine, NumpyBinningMachine
@@ -196,7 +189,7 @@ class FeatureCache(object):
 
     def __init__(self, df):
         self._rows = df.shape[0]
-        self._directory = hash_df(df)
+        self._directory = smart_hash(df)
         self.raw = df
 
     def validate(self, df, is_safe=True):
@@ -256,16 +249,7 @@ class MachineCache(GenericObject):
         return machine_cache(filename, clf, X, y)
 
 
-class MachineWrapper(GenericObject):
-
-    """ parent class of a series of classes meant to wrap machine learning algorithms
-    """
-
-    def __getattr__(self, name):
-        return getattr(self.clf, name)
-
-
-class PredictReshaper(MachineWrapper):
+class PredictReshaper(TransformWrapper):
 
     """ Wraps a machine so that it's predict method returns a 2D array with a specified number of columns (defualt=1).
     """
@@ -273,40 +257,6 @@ class PredictReshaper(MachineWrapper):
 
     def predict(self, *args, **kwargs):
         return self.clf.predict(*args, **kwargs).reshape(-1, self.predict_cols)
-
-
-class PrefitMachine(MachineWrapper):
-
-    """ Wraps a machine so that it's fit method doesn't change object state.
-    """
-
-    def fit(self, *args, **kwargs):
-        pass
-
-
-class PickleMachine(MachineWrapper):
-
-    """ Wraps a machine so that it saves a pickle of the classifier after training.
-    """
-
-    def fit(self, *args, **kwargs):
-        result = self.clf.fit(*args, **kwargs)
-        quick_save("pickle_machine", self.name, self.clf)
-        return result
-
-
-class SparseFiltering(GenericObject):
-
-    """ Machine for calling sparse filtering algorithm.
-    """
-
-    _default_args = dict(N=1000)
-
-    def fit(self, X, y=None):
-        self.W = sparse_filtering.sparseFiltering(self.N, X.T)
-
-    def transform(self, X):
-        return sparse_filtering.feedForwardSF(self.W, X.T)
 
 
 class NumericalToCategorical(GenericObject):
@@ -431,50 +381,6 @@ def kmeans_linear_model(n_clusters=2, alpha=1.0, l1_ratio=0.5, fit_intercept=Tru
     transformer = MiniBatchKMeans(n_clusters=n_clusters, compute_labels=False, random_state=None)
     predicter = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=fit_intercept, positive=positive)
     return TransformPredictMachine(transformer, predicter)
-
-
-class MachineFactory(GenericObject):
-
-    """ Class that allows wrapping of functions into a predicting machine. Assumes that the first input to the prediction function is the output of the fit function.
-    """
-
-    _required_args = ('fit_func', 'predict_func')
-
-    def fit(self, *args, **kwargs):
-        self.fit_params = self.fit_func(*args, **kwargs)
-        return self
-
-    def predict(self, *args, **kwargs):
-        return self.predict_func(self.fit_params, *args, **kwargs)
-
-
-def infinity_remover():
-    """ returns a class that removes infinity columns from a data frame
-    """
-    return MachineFactory(fit_func=get_no_inf_cols, predict_func=remove_inf_cols)
-
-
-class ValidationFeature(MachineWrapper):
-
-    """ Creates cross-validated features when training.Requires being in a Trial in order to predict.
-    """
-
-    _default_args = dict(n_jobs=1, stratified=False, n_folds=3, validation_set=False, cv_X=None, cv_y=None)
-
-    def predict(self, X, y=None):
-        if Trial.train_mode():
-            if self.validation_set:
-                return fit_predict(self.clf, self.cv_X, self.cv_y, X)
-            else:
-                return cv_fit_predict(self.clf, X, y, self.stratified, self.n_folds, self.n_jobs)
-        else:
-            return self.clf.predict(X)
-
-    def fit_predict(self, item):
-        X, y, X_test = item
-        tmp_clf = deepcopy(self.clf)
-        tmp_clf.fit(X, y)
-        return tmp_clf.predict(X_test)
 
 
 class ResidualPredicter(GenericObject):

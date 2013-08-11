@@ -12,16 +12,20 @@
     -machine_cache
     -related_filenames
     -modified_time
+    -backup_filename
     -backup_open
     -quick_save2
     -quick_load2
     -quick_write2
     -quick_read2
+    -joblib_save
+    -joblib_load
 
 """
 import gc
 import cPickle as pickle
 import shelve
+import joblib
 from os import makedirs, path
 
 import SETTINGS
@@ -166,15 +170,23 @@ def modified_time(full_filename):
     return path.getmtime(full_filename)
 
 
+def backup_filename(full_filename, write_mode=True, num=2):
+    """ gets the filename to read from / write to, so that data isn't lost in case of a failure
+    """
+    if num < 2:
+        return full_filename
+    filenames = related_filenames(full_filename, num)
+    times = map(modified_time, filenames)
+    indices = sorted(range(num), key=lambda x: times[x])
+    idx = indices[0] if write_mode else indices[-1]
+    return filenames[idx]
+
+
 def backup_open(full_filename, flag='r', num=2):
     """ writes and reads to/from a group of files, so that data isn't lost in case of a failure
     """
     assert flag in 'war'
-    filenames = related_filenames(full_filename, num)
-    times = map(modified_time, filenames)
-    indices = sorted(range(num), key=lambda x: times[x])
-    idx = indices[-1] if flag == 'r' else indices[0]
-    new_filename = filenames[idx]
+    new_filename = backup_filename(full_filename, flag != 'r', num)
     return open(new_filename, flag)
 
 
@@ -215,3 +227,20 @@ def quick_read2(directory, basename):
     new_filename = filename(directory, basename, "txt")
     with backup_open(new_filename) as infile:
         return infile.read()
+
+
+def joblib_save(directory, basename, obj):
+    """Quickly serialize an object in a file
+    """
+    try_mkdir(directory)
+    full_filename = filename(directory, basename, "pickle")
+    new_filename = backup_filename(full_filename, write_mode=True, num=2)
+    joblib.dump(obj, new_filename, compress=0)
+
+
+def joblib_load(directory, basename):
+    """Quickly deserialize an object in a file
+    """
+    full_filename = filename(directory, basename, "pickle")
+    new_filename = backup_filename(full_filename, write_mode=False, num=2)
+    return joblib.load(new_filename, mmap_mode='r')

@@ -1,24 +1,31 @@
+transform_wrapper
+    -refactor Stateful into a transform
+
 decorators
     -make decorator decorator to easily create decorators that take input
+    -test if memmap decorator actually saves memory
 
 sampling_machine
     -make parallel
 
 classes
-    -near zero variance filter (make sure to save which rows are removed w/ fit & transform)
+    -refactor machines to transformers
 
 binning_machine
     -predict_proba
 
-sparse_filtering
-    -rewrite to be more clear / efficient
-    -rewrite in cython
+Trial
+    -clfs and clf_times not working?
 
 to make:
+    -rejection sampler
+        -test accuracy vs normal subsampling
+    -script to call libFM
     -elm transform(n_hidden, activation function)
-        -elm transform with l1 feature selection
+        -elm transform with l1 feature selection (pruning)
+    greedy feature removal
+        -loop to find worst feature, repeat until CV score stops improving
     -exploration
-    -visualization
     -feature creation file
         -update generic_feature_creation to use num->cat and cat->num
         -create function for creating features from a list of dates
@@ -30,9 +37,23 @@ to make:
             -max time between occurences
             -min time between occurences
             -etc ?
+        -text features
+            -convert to ascii then do the ff:
+            -% of each letter
+            -length
+            -num words
+            -num capital
+            -avg word length
+            -% not alnum (minus spaces)
+            -% digit
+            -% letters
         -use sklearn.semi_supervised for imputation
     -spearmint-lite wrapper
         -ability to add / remove runs manually
         -compile with Cython
+        -ability to record all runs for visualization / analysis
+        -plot function that shows heat map for each pair of hyperparameters
     -par_quick_save / par_quick_load / par_quick_write
     -qsave / qload / qsave / qload / qwrite / qread (no need directory)
+    -s* for storage, which saves/loads to a settings directory
+    -python msda

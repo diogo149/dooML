@@ -19,8 +19,7 @@ def main_func(params):
 
 
 def main(job_id, params):
-    # this will land in output/ files
-    print 'Job id: ', str(job_id)
+    print 'Job id: ', str(job_id)  # this will land in output/ files
     print params
     random_seed(int(job_id))
     result = main_func(spearmint_params(params))
