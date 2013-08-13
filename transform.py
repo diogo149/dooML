@@ -81,11 +81,15 @@ class SklearnBridge(GenericTransform):
     _required_args = ('clf',)
 
     def _fit(self, X, y=None):
+        if y is not None and y.shape[1] == 1:
+            y = y.flatten()
         self.clf.fit(X, y)
 
     def _transform(self, X):
         if hasattr(self.clf, "predict_proba"):
             result = self.clf.predict_proba(X)
+            if result.shape[1] == 2:
+                result = result[:, 1]
         elif hasattr(self.clf, "predict"):
             result = self.clf.predict(X)
         else:

@@ -30,8 +30,8 @@ def cv_fit_transform(trn, X, y=None, stratified=False, n_folds=3):
     """ return cross-validated transform features
     """
     rows = X.shape[0]
+    n_folds = min(n_folds, rows)
     kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(rows, n_folds, shuffle=True))
-    print kfold
     items = ((trn, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold)
     mapped = joblib_parmap(args_expander, items, fit_transform)
     transformed = [None] * rows

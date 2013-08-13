@@ -37,9 +37,11 @@
     -bool_to_int
     -to_memmap
     -memmap_hstack
+    -set_debug_logging
+    -sample_tune
 
 """
-from __future__ import print_function
+from __future__ import print_function, division
 import numpy as np
 import pandas as pd
 import joblib
@@ -47,20 +49,22 @@ import random
 import re
 import itertools
 import tempfile
+import time
+import logging
+import math
+import subprocess
+import datetime
+import copy
+import pdb
 
-from math import exp, sqrt, log
-from pdb import set_trace
-from datetime import datetime
-from copy import deepcopy
-from subprocess import check_output
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.cross_validation import KFold, StratifiedKFold
 
 import SETTINGS
-from decorators import default_catcher
+from decorators import default_catcher, log
 from storage import machine_cache
 
-debug = set_trace
+debug = pdb.set_trace
 
 
 def column_append(s, df):
@@ -137,7 +141,7 @@ def binarize(data):
 def current_time():
     """ Returns current time as a string.
     """
-    return str(datetime.now())
+    return str(datetime.datetime.now())
 
 
 def print_current_time():
@@ -213,7 +217,7 @@ def args_expander(func, item):
 def fit_predict(clf, X, y, X_test, cache=False):
     """ makes a copy of a machine, then fits it on training data and predicts on test data. useful for parallel maps.
     """
-    tmp_clf = deepcopy(clf)
+    tmp_clf = copy.deepcopy(clf)
     if cache:
         tmp_clf = machine_cache(smart_hash(X), tmp_clf, X, y)
     else:
@@ -224,7 +228,7 @@ def fit_predict(clf, X, y, X_test, cache=False):
 def fit_transform(trn, X, y, X_test):
     """ makes a copy of a transform, then fits it on training data and predicts on test data. useful for parallel maps.
     """
-    temp_trn = deepcopy(trn)
+    temp_trn = copy.deepcopy(trn)
     temp_trn.fit(X, y)
     return temp_trn.transform(X_test)
 
@@ -276,7 +280,7 @@ def is_prime(n):
 def extract_output(cmd_list, pattern):
     """ performs a search for a pattern in the stdout of a command and returns a list of all matches
     """
-    output = check_output(cmd_list)
+    output = subprocess.check_output(cmd_list)
     return re.findall(pattern, output)
 
 
@@ -287,7 +291,7 @@ def spearmint_params(params):
         if len(params[key]) == 1:
             params[key] = params[key][0]
             if key.startswith('log_'):
-                params[key[4:]] = exp(params[key])
+                params[key[4:]] = math.exp(params[key])
                 params.pop(key)
     return params
 
@@ -358,9 +362,9 @@ def flexible_int_input(in_val, size):
     elif isinstance(in_val, int) and in_val > 1:
         return min(size, in_val)
     elif in_val == "sqrt":
-        return int(round(sqrt(size)))
+        return int(round(math.sqrt(size)))
     elif in_val == "log2":
-        return int(round(log(size) / log(2)))
+        return int(round(math.log(size) / math.log(2)))
     elif in_val == "auto":
         return size
 
@@ -403,7 +407,7 @@ def bool_to_int(boolean):
 def to_memmap(X):
     """ returns a memmap of the input numpy array
     """
-    dtype = arg.dtype if SETTINGS.UTILS.MEMMAP_DTYPE is None else SETTINGS.UTILS.MEMMAP_DTYPE
+    dtype = X.dtype if SETTINGS.UTILS.MEMMAP_DTYPE is None else SETTINGS.UTILS.MEMMAP_DTYPE
     with tempfile.TemporaryFile() as infile:
         memmapped = np.memmap(infile, dtype=dtype, shape=X.shape)
     memmapped[:] = X
@@ -413,6 +417,7 @@ def to_memmap(X):
 def memmap_hstack(Xs):
     """ returns a memmapped hstack of input arrays in a memory efficient manner
     """
+    assert len(Xs)
     shapes = [X.shape for X in Xs]
     assert all_iterable(shapes, lambda x: len(x) == 2), "input array is not 2D"
     columns, rows = zip(*shapes)
@@ -430,3 +435,44 @@ def memmap_hstack(Xs):
         memmapped[:, offset:offset + row] = X
         offset += row
     return memmapped
+
+
+def set_debug_logging(log=True):
+    """ activates or deactivates logging debug statements
+    """
+    if log:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+
+def sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10):
+    """ determines the ideal amount of input data (rows) to train a transform in a certain amount of time assuming that fitting the transform is the bottleneck
+    -assumes that data is normally distributed
+    -won't be accurate for convergence based methods
+    -dtype used will be np.float32
+    -assuming time = a * n ** p -> p = log_n (time) - log_n(a) - lower order terms
+    """
+    @log
+    def fit_time(num):
+        num = int(round(num))
+        X = np.random.randn(num, X_col).astype(np.float32)
+        y = np.random.randn(num, y_col) if y_categories < 2 else np.random.randint(0, y_categories, (num, y_col))
+        y = y.astype(np.float32)
+        start_time = time.time()
+        trn.fit(X, y)
+        return time.time() - start_time
+
+    num, factor, tol = 20, 2.0, 0.1
+    prev = fit_time(num / factor)
+    for _ in xrange(100):
+        next = fit_time(num)
+        growth = math.log(next / prev) / math.log(factor)
+        growth = max(growth, 2)
+        factor = (seconds / next) ** (1.0 / growth)
+        prev = next
+        num *= factor
+        if abs(1 - seconds / next) <= tol:
+            break
+
+    return num

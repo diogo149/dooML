@@ -6,6 +6,8 @@
     -timer
     -trace_error
     -ignore_args
+    -deprecated
+    -untested
     -memmap
 
     -decorate_fit
@@ -21,6 +23,8 @@
 
 from __future__ import print_function
 import numpy as np
+import warnings
+import logging
 
 from time import time
 from pdb import set_trace
@@ -68,22 +72,14 @@ def log(func):
     Logs input, output, and time takes of a decorated function.
     """
     def wrapped(*args, **kwargs):
-        if SETTINGS.DECORATORS.LOG:
-            print("Calling function: " + func.func_name)
-            print("  Arguments:")
-            for arg in args:
-                print("    {}".format(arg))
-            print("  Keyword Arguments:")
-            for k, v in kwargs.items():
-                print("    {}: {}".format(k, v))
-            start_time = time()
+        logging.debug('Calling %s', func)
+        logging.debug('INPUT (args)  : %s', args)
+        logging.debug('INPUT (kwargs): %s', kwargs)
+        start_time = time()
         output = func(*args, **kwargs)
-        if SETTINGS.DECORATORS.LOG:
-            print("Returning function: " + func.func_name)
-            print("Took {} seconds".format(time() - start_time))
-            print("  Output:")
-            print("    {}\n".format(output))
-
+        logging.debug('Returning %s', func)
+        logging.debug('Took: %lf secs', time() - start_time)
+        logging.debug('OUTPUT (kwargs): %s', output)
         return output
 
     wrapped.func_name = func_name(func)
@@ -131,6 +127,27 @@ def ignore_args(func):
     return wrapped
 
 
+def deprecated(func):
+
+    def wrapped(*args, **kwargs):
+        warnings.warn("Deprecated: {}".format(func))
+        return func(*args, **kwargs)
+
+    wrapped.func_name = func_name(func)
+    return wrapped
+
+
+def untested(func):
+
+    def wrapped(*args, **kwargs):
+        warnings.warn("Untested: {}".format(func))
+        return func(*args, **kwargs)
+
+    wrapped.func_name = func_name(func)
+    return wrapped
+
+
+@untested
 def memmap(func):
     """ converts numpy array inputs into memmaps. useful for parallelization.
     """
