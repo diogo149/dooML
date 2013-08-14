@@ -1,5 +1,5 @@
 """Table of Contents:
-    -cv_fit_predict
+    -cv_fit_transform
     -multi_feature_scorer
     -machine_feature_scorer
 
@@ -9,21 +9,8 @@ import numpy as np
 
 from sklearn.cross_validation import StratifiedKFold, KFold
 
-from utils import fit_predict, fit_transform, args_expander, kfold_feature_scorer, machine_score_func
-from parallel import parmap, parfor, joblib_parmap
-
-
-def cv_fit_predict(clf, X, y, stratified=False, n_folds=3, n_jobs=1):
-    """ returns cross-validation predictions of a machine
-    """
-    assert isinstance(X, np.ndarray)
-    kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(y.shape[0], n_folds, shuffle=True))
-    items = [(clf, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold]
-    mapped = parmap(args_expander, items, args=(fit_predict,), n_jobs=n_jobs)
-    prediction = np.ones(y.shape)
-    for (_, test_idx), vals in zip(kfold, mapped):
-        prediction[test_idx] = vals
-    return prediction
+from utils import fit_transform, args_expander, kfold_feature_scorer, machine_score_func
+from parallel import parfor, joblib_parmap
 
 
 def cv_fit_transform(trn, X, y=None, stratified=False, n_folds=3):

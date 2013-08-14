@@ -12,9 +12,6 @@
     -FittedClustering
     -fitted_minibatchkmeans
     -fitted_kmeans
-    -TransformPredictMachine
-    -kmeans_linear_model
-    -ResidualPredicter
 
     -BinningMachine
     -NumpyBinningMachine
@@ -34,12 +31,9 @@ from functools import partial
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.decomposition import RandomizedPCA
 from sklearn.cluster import MiniBatchKMeans, KMeans
-from sklearn.linear_model import ElasticNet
-from sklearn.ensemble import GradientBoostingRegressor
 
 from storage import quick_write, quick_save, quick_load, quick_exists, machine_cache
 from utils import is_categorical, smart_hash, random_seed
-from utils2 import cv_fit_predict
 from helper import gap_statistic
 
 # these are imported so that they can be imported from this file
@@ -352,48 +346,6 @@ def fitted_minibatchkmeans(min_clusters=1):
 
 def fitted_kmeans(min_clusters=1):
     return FittedClustering(clustering=KMeans, min_clusters=min_clusters)
-
-
-class TransformPredictMachine(GenericObject):
-
-    _required_args = ('transformer', 'predicter')
-
-    def fit(self, X, y):
-        tmp = self.transformer.fit_transform(X, y)
-        self.predicter.fit(tmp, y)
-
-    def predict(self, X):
-        tmp = self.transformer.transform(X)
-        return self.predicter.predict(tmp)
-
-
-def kmeans_linear_model(n_clusters=2, alpha=1.0, l1_ratio=0.5, fit_intercept=True, positive=False):
-    transformer = MiniBatchKMeans(n_clusters=n_clusters, compute_labels=False, random_state=None)
-    predicter = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, fit_intercept=fit_intercept, positive=positive)
-    return TransformPredictMachine(transformer, predicter)
-
-
-class ResidualPredicter(GenericObject):
-
-    """ Predicts the residual of a classifier using another classifier.
-    """
-
-    _required_args = ('clf1',)
-    _default_args = dict(clf2=None, n_folds=3, n_jobs=1)
-
-    # get validation feature
-
-    def fit(self, X, y):
-        self.clf1.fit(X, y)
-        predictions = cv_fit_predict(self.clf1, X, y, n_folds=self.n_folds, n_jobs=self.n_jobs)
-        if self.clf2 is None:
-            self.clf2 = GradientBoostingRegressor(loss='huber', n_estimators=100, subsample=0.5, max_features=int(np.sqrt(X.shape[1])))
-        self.clf2.fit(X, predictions)
-        return y - self.clf2.predict(X)
-
-    def predict(self, *args, **kwargs):
-        return self.clf2.predict(*args, **kwargs)
-
 
 if __name__ == "__main__":
     from sklearn.linear_model import LinearRegression

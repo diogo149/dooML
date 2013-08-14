@@ -38,6 +38,7 @@
     -to_memmap
     -memmap_hstack
     -set_debug_logging
+    -naive_sample_tune
     -sample_tune
 
 """
@@ -446,6 +447,29 @@ def set_debug_logging(log=True):
         logging.basicConfig(level=logging.INFO)
 
 
+def naive_sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10, guess=10, growth=1.5):
+    """ determines the ideal amount of input data (rows) to train a transform in a certain amount of time assuming that fitting the transform is the bottleneck
+    -assumes that data is normally distributed
+    -won't be accurate for convergence based methods
+    -dtype used will be np.float32
+    """
+    @log
+    def fit_time(num):
+        num = int(round(num))
+        X = np.random.randn(num, X_col).astype(np.float32)
+        y = np.random.randn(num, y_col) if y_categories < 2 else np.random.randint(0, y_categories, (num, y_col))
+        y = y.astype(np.float32)
+        start_time = time.time()
+        trn.fit(X, y)
+        return time.time() - start_time
+
+    while True:
+        time_taken = fit_time(guess)
+        if time_taken >= seconds:
+            return guess
+        guess = growth * guess
+
+
 def sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10):
     """ determines the ideal amount of input data (rows) to train a transform in a certain amount of time assuming that fitting the transform is the bottleneck
     -assumes that data is normally distributed
@@ -463,16 +487,20 @@ def sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10):
         trn.fit(X, y)
         return time.time() - start_time
 
-    num, factor, tol = 20, 2.0, 0.1
-    prev = fit_time(num / factor)
+    tol = 0.1
+    guess = 10
+    max_growth = 1.5
+    time_taken = last_guess = 1e10
     for _ in xrange(100):
-        next = fit_time(num)
-        growth = math.log(next / prev) / math.log(factor)
-        growth = max(growth, 2)
-        factor = (seconds / next) ** (1.0 / growth)
-        prev = next
-        num *= factor
-        if abs(1 - seconds / next) <= tol:
+        last_time = time_taken
+        time_taken = fit_time(guess)
+        growth = math.log(time_taken / last_time) / math.log(guess / last_guess)
+        last_guess = guess
+        if time_taken >= seconds * (1 - tol):
             break
-
-    return num
+        elif time_taken * time_taken / last_time < seconds:
+            guess = max_growth * last_guess
+        else:
+            guess = last_guess * (seconds / time_taken) ** (1.0 / growth)
+        guess = int(round(guess))
+    return last_guess

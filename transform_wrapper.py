@@ -4,19 +4,19 @@
     -QuickSave
     -RowSubset
     -ColSubset
-    -Costing
-
-    -Stateful !!!
+    -RejectionSample
+    -tuned_rejection_sample
 """
 from __future__ import division
 import numpy as np
 
 from copy import deepcopy
 
+from decorators import deprecated
 from storage import quick_save
-from utils import fit_predict, flexible_int_input
-from utils2 import cv_fit_predict
-from classes import GenericObject, Trial
+
+from utils import flexible_int_input, sample_tune
+from classes import GenericObject
 
 
 class TransformWrapper(GenericObject):
@@ -99,29 +99,8 @@ class RejectionSample(TransformWrapper):
         return np.mean([trn.predict(X) for trn in self.trns], axis=0)
 
 
-class Stateful(TransformWrapper):
-    pass
-#
-#
-# FIXME make sure this follows the transform assumptions
-
-
-class Stateful_OLD(TransformWrapper):
-
-    """ Creates cross-validated features when training.Requires being in a Trial in order to predict.
+def tuned_rejection_sample(trn, X_col, weights=None, n_iter=100, y_col=1, y_categories=1, seconds=10):
+    """ returns a RejectionSample wrapped transform with the quantity tuned to take a certain amount of time
     """
-
-    _default_args = dict(n_jobs=1, stratified=False, n_folds=3, validation_set=False, cv_X=None, cv_y=None)
-
-    def predict(self, X, y=None):
-        if Trial.train_mode():
-            if self.validation_set:
-                return fit_predict(self.trn, self.cv_X, self.cv_y, X)
-            else:
-                return cv_fit_predict(self.trn, X, y, self.stratified, self.n_folds, self.n_jobs)
-        else:
-            return self.trn.predict(X)
-
-#
-#
-#
+    train_size = sample_tune(trn, X_col, y_col, y_categories, seconds)
+    return RejectionSample(trn=trn, weights=weights, train_size=train_size, n_iter=n_iter)
