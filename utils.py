@@ -498,7 +498,7 @@ def sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10):
         last_guess = guess
         if time_taken >= seconds * (1 - tol):
             break
-        elif time_taken * time_taken / last_time < seconds:
+        elif time_taken * time_taken / last_time < seconds:  # potential bug here since the growth of the previous iteration may not be max_growth, and would thus overshoot the time by the ideal amount by ~max_growth
             guess = max_growth * last_guess
         else:
             guess = last_guess * (seconds / time_taken) ** (1.0 / growth)

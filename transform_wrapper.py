@@ -86,8 +86,13 @@ class RejectionSample(TransformWrapper):
         self.trns = []
         rows = X.shape[0]
         train_size = flexible_int_input(self.train_size, rows)
-        weights = np.ones(rows) if self.weights is None else self.weights / self.weights.max()
-        weights = weights * weights.sum() * train_size / rows
+        if self.weights is None:
+            weights = np.ones(rows)
+        else:
+            weights = np.abs(self.weights.flatten())
+            weights = weights / weights.max()
+        if weights.sum() > train_size:
+            weights = weights * train_size / weights.sum()
         for i in xrange(self.n_iter):
             subset = weights > np.random.uniform(size=rows)
             trn = RowSubset(subset=subset, trn=deepcopy(self.trn))

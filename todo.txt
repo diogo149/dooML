@@ -1,6 +1,3 @@
-transform_wrapper
-    -refactor Stateful into a transform
-
 sampling_machine
     -make parallel
 
@@ -13,8 +10,11 @@ binning_machine
 Trial
     -clfs and clf_times not working?
 
-to make:
+decorators
     -add more logging
+    -use logging for timer as well (but at a lower setting) and use more places
+
+to make:
     -rejection sampler
         -test accuracy vs normal subsampling
     -script to call libFM
