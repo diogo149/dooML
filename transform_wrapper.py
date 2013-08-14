@@ -12,7 +12,6 @@ import numpy as np
 
 from copy import deepcopy
 
-from decorators import deprecated
 from storage import quick_save
 
 from utils import flexible_int_input, sample_tune
@@ -96,7 +95,7 @@ class RejectionSample(TransformWrapper):
         return self
 
     def transform(self, X):
-        return np.mean([trn.predict(X) for trn in self.trns], axis=0)
+        return np.mean([trn.transform(X) for trn in self.trns], axis=0)
 
 
 def tuned_rejection_sample(trn, X_col, weights=None, n_iter=100, y_col=1, y_categories=1, seconds=10):
