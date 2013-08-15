@@ -14,7 +14,7 @@ from copy import deepcopy
 
 from storage import quick_save
 
-from utils import flexible_int_input, sample_tune
+from utils import flexible_int_input, sample_tune, to_memmap
 from classes import GenericObject
 from parallel import pmap
 
@@ -26,8 +26,11 @@ class TransformWrapper(GenericObject):
 
     _required_args = ('trn',)
 
-    def __getattr__(self, name):
-        return getattr(self.trn, name)
+    def fit(self, X, y=None):
+        return self.trn.fit(X, y)
+
+    def transform(self, X):
+        return selt.trn.transform(X)
 
 
 class NoFit(TransformWrapper):
@@ -76,6 +79,12 @@ class ColSubset(TransformWrapper):
         return self.trn.fit(X, y)
 
 
+def pmap_helper(subset, X, y, trn):
+    trn = RowSubset(subset=subset, trn=deepcopy(trn))
+    trn.fit(X, y)
+    return trn
+
+
 class RejectionSample(TransformWrapper):
 
     """ uses rejection sampling with input weights
@@ -84,7 +93,8 @@ class RejectionSample(TransformWrapper):
     _default_args = dict(weights=None, train_size=None, n_iter=100)
 
     def fit(self, X, y=None):
-        self.trns = []
+        X = to_memmap(X)
+        y = y if y is None else to_memmap(y)
         rows = X.shape[0]
         train_size = flexible_int_input(self.train_size, rows)
         if self.weights is None:
@@ -96,18 +106,9 @@ class RejectionSample(TransformWrapper):
                 weights = weights * train_size / weights.sum()
             else:
                 weights = 1 - (1 - weights) * (rows - train_size) / (rows - weights.sum())
-        # for i in xrange(self.n_iter):
-        #     subset = weights > np.random.uniform(size=rows)
-        #     trn = RowSubset(subset=subset, trn=deepcopy(self.trn))
-        #     self.trns.append(trn.fit(X, y))
         subsets = (weights > np.random.uniform(size=rows) for _ in xrange(self.n_iter))
-        self.trns = pmap(self.pmap_helper, subsets, X=X, y=y)
+        self.trns = pmap(pmap_helper, subsets, X=X, y=y, trn=self.trn)
         return self
-
-    def pmap_helper(self, subset, X, y):
-        trn = RowSubset(subset=subset, trn=deepcopy(self.trn))
-        trn.fit(X, y)
-        return trn
 
     def transform(self, X):
         return np.mean([trn.transform(X) for trn in self.trns], axis=0)
