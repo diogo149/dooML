@@ -408,6 +408,8 @@ def bool_to_int(boolean):
 def to_memmap(X):
     """ returns a memmap of the input numpy array
     """
+    if isinstance(X, np.memmap):
+        return X
     dtype = X.dtype if SETTINGS.UTILS.MEMMAP_DTYPE is None else SETTINGS.UTILS.MEMMAP_DTYPE
     with tempfile.TemporaryFile() as infile:
         memmapped = np.memmap(infile, dtype=dtype, shape=X.shape)
