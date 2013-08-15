@@ -6,10 +6,13 @@
     -random_parmap
     -joblib_parmap
     -joblib_run
+    -no_pickle_parmap
+    -pmap
 """
 
 import multiprocessing
 
+from pickle import PicklingError
 from functools import partial
 from joblib import Parallel, delayed
 
@@ -40,6 +43,7 @@ def parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
     return mapped
 
 
+@deprecated
 def pipe_parmap(func, X, n_jobs=1):
     """ alternative parallel map
 
@@ -113,6 +117,39 @@ def joblib_run(delayed_generator):
     return Parallel(n_jobs=SETTINGS.PARALLEL.JOBS, verbose=SETTINGS.PARALLEL.JOBLIB_VERBOSE, pre_dispatch=SETTINGS.PARALLEL.JOBLIB_PRE_DISPATCH)(delayed_generator)
 
 
+def no_pickle_parmap(func, X):
+    """ alternative parallel map that allows for unpicklable items by using pipes
+
+    source: http://stackoverflow.com/questions/3288595/multiprocessing-using-pool-map-on-a-function-defined-in-a-class
+    """
+    def spawn(func):
+        def fun(q_in, q_out):
+            while True:
+                i, x = q_in.get()
+                if i is None:
+                    break
+                q_out.put((i, func(x)))
+        return fun
+
+    n_jobs = multiprocessing.cpu_count()
+
+    q_in = multiprocessing.Queue(1)
+    q_out = multiprocessing.Queue()
+
+    proc = [multiprocessing.Process(target=spawn(func), args=(q_in, q_out)) for _ in range(n_jobs)]
+    for p in proc:
+        p.daemon = True
+        p.start()
+
+    sent = [q_in.put((i, x)) for i, x in enumerate(X)]
+    [q_in.put((None, None)) for _ in range(n_jobs)]
+    res = [q_out.get() for _ in range(len(sent))]
+
+    [p.join() for p in proc]
+
+    return [x for i, x in sorted(res)]
+
+
 def pmap(func, generator, *args, **kwargs):
     """ parallel map that only parallelizes if not already within a pmap
     """
@@ -123,5 +160,7 @@ def pmap(func, generator, *args, **kwargs):
         try:
             SETTINGS.PARALLEL.PMAP = True
             return joblib_parmap(new_func, generator)
+        except PicklingError:
+            return no_pickle_parmap(new_func, generator)
         finally:
             SETTINGS.PARALLEL.PMAP = False
