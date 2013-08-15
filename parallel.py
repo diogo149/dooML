@@ -11,6 +11,7 @@
 """
 
 import multiprocessing
+import logging
 
 from pickle import PicklingError
 from functools import partial
@@ -161,6 +162,7 @@ def pmap(func, generator, *args, **kwargs):
             SETTINGS.PARALLEL.PMAP = True
             return joblib_parmap(new_func, generator)
         except PicklingError:
+            logging.log(30, "pmap: PicklingError")
             return no_pickle_parmap(new_func, generator)
         finally:
             SETTINGS.PARALLEL.PMAP = False

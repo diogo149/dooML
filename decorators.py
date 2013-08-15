@@ -8,6 +8,7 @@
     -ignore_args
     -deprecated
     -untested
+    -todo
     -memmap
 
     -decorate_fit
@@ -102,8 +103,7 @@ def timer(func):
 
 
 def trace_error(func):
-    """
-    If decorated function throws an exception, then the python debugger is started.
+    """ If decorated function throws an exception, then the python debugger is started.
     """
 
     def wrapped(*args, **kwargs):
@@ -119,6 +119,8 @@ def trace_error(func):
 
 
 def ignore_args(func):
+    """ decorated functions ignores input arguments
+    """
 
     def wrapped(*args, **kwargs):
         return func()
@@ -128,6 +130,8 @@ def ignore_args(func):
 
 
 def deprecated(func):
+    """ warns if decorated function is used
+    """
 
     def wrapped(*args, **kwargs):
         warnings.warn("Deprecated: {}".format(func))
@@ -138,6 +142,8 @@ def deprecated(func):
 
 
 def untested(func):
+    """ warns if decorated function is used
+    """
 
     def wrapped(*args, **kwargs):
         warnings.warn("Untested: {}".format(func))
@@ -145,6 +151,18 @@ def untested(func):
 
     wrapped.func_name = func_name(func)
     return wrapped
+
+
+def todo(msg):
+    """ alerts about a todo if decorated function is used
+    """
+    def decorator(func):
+        def wrapped(*args, **kwargs):
+            warnings.warn("TODO: {}; {}".format(func, msg))
+            return func(*args, **kwargs)
+        wrapped.func_name = func_name(func)
+        return wrapped
+    return decorator
 
 
 @untested

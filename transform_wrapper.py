@@ -87,17 +87,26 @@ class RejectionSample(TransformWrapper):
         rows = X.shape[0]
         train_size = flexible_int_input(self.train_size, rows)
         if self.weights is None:
-            weights = np.ones(rows)
+            weights = np.ones(rows) * train_size / rows
         else:
             weights = np.abs(self.weights.flatten())
             weights = weights / weights.max()
-        if weights.sum() > train_size:
-            weights = weights * train_size / weights.sum()
-        for i in xrange(self.n_iter):
-            subset = weights > np.random.uniform(size=rows)
-            trn = RowSubset(subset=subset, trn=deepcopy(self.trn))
-            self.trns.append(trn.fit(X, y))
+            if weights.sum() >= train_size:
+                weights = weights * train_size / weights.sum()
+            else:
+                weights = 1 - (1 - weights) * (rows - train_size) / (rows - weights.sum())
+        # for i in xrange(self.n_iter):
+        #     subset = weights > np.random.uniform(size=rows)
+        #     trn = RowSubset(subset=subset, trn=deepcopy(self.trn))
+        #     self.trns.append(trn.fit(X, y))
+        subsets = (weights > np.random.uniform(size=rows) for _ in xrange(self.n_iter))
+        self.trns = pmap(self.pmap_helper, subsets, X=X, y=y)
         return self
+
+    def pmap_helper(self, subset, X, y):
+        trn = RowSubset(subset=subset, trn=deepcopy(self.trn))
+        trn.fit(X, y)
+        return trn
 
     def transform(self, X):
         return np.mean([trn.transform(X) for trn in self.trns], axis=0)
