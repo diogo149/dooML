@@ -109,7 +109,7 @@ def joblib_parmap(func, generator):
     """
     try:
         new_func = delayed(func)
-    except TypeError e:
+    except TypeError as e:
         raise PicklingError(e)
     return joblib_run(new_func(item) for item in generator)
 
