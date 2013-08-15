@@ -167,3 +167,24 @@ def row_normalizer(order=None):
     """ Normalize each row, given an order
     """
     return RowApply(func=partial(np.linalg.norm, ord=order))
+
+
+class sklearn_bridge(object):
+
+    """ class to easily import scikit-learn transforms already wrapper with a SklearnBridge
+    """
+
+    def __init__(self, __submodule=None):
+        if __submodule is None:
+            self.__submodule = __import__("sklearn")
+        else:
+            self.__submodule = __submodule
+
+    def __getattr__(self, name):
+        return sklearn_bridge(getattr(self.__submodule, name))
+
+    def __call__(self, *args, **kwargs):
+        if hasattr(self.__submodule, "fit"):
+            return SklearnBridge(clf=self.__submodule(*args, **kwargs))
+        else:
+            return self.__submodule(*args, **kwa)
