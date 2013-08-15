@@ -30,7 +30,7 @@ class TransformWrapper(GenericObject):
         return self.trn.fit(X, y)
 
     def transform(self, X):
-        return selt.trn.transform(X)
+        return self.trn.transform(X)
 
 
 class NoFit(TransformWrapper):
