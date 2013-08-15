@@ -16,6 +16,7 @@ from storage import quick_save
 
 from utils import flexible_int_input, sample_tune
 from classes import GenericObject
+from parallel import pmap
 
 
 class TransformWrapper(GenericObject):
