@@ -14,9 +14,11 @@ from functools import partial
 from joblib import Parallel, delayed
 
 import SETTINGS
+from decorators import deprecated
 from utils import random_seed
 
 
+@deprecated
 def parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
     """ easy parallel map, but it pickles input arguments and thus can't be used for dynamically generated functions.
     """
@@ -97,10 +99,10 @@ def random_parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
     return parmap(random_parmap_helper, zip(range(len(in_vals)), in_vals), [func, args, kwargs], n_jobs=n_jobs)
 
 
-def joblib_parmap(func, generator, *args, **kwargs):
+def joblib_parmap(func, generator):
     """ parallel map using joblib, but it pickles input arguments and thus can't be used for dynamically generated functions.
     """
-    new_func = delayed(partial(func, *args, **kwargs) if args or kwargs else func)
+    new_func = delayed(func)
     return joblib_run(new_func(item) for item in generator)
 
 
@@ -109,3 +111,17 @@ def joblib_run(delayed_generator):
     NOTE: the functions run do not have to be homogeneous, you can make arbitrary generators with whatever functions as long as they are pickle-able
     """
     return Parallel(n_jobs=SETTINGS.PARALLEL.JOBS, verbose=SETTINGS.PARALLEL.JOBLIB_VERBOSE, pre_dispatch=SETTINGS.PARALLEL.JOBLIB_PRE_DISPATCH)(delayed_generator)
+
+
+def pmap(func, generator, *args, **kwargs):
+    """ parallel map that only parallelizes if not already within a pmap
+    """
+    new_func = partial(func, *args, **kwargs) if args or kwargs else func
+    if SETTINGS.PARALLEL.PMAP:
+        return map(new_func, generator)
+    else:
+        try:
+            SETTINGS.PARALLEL.PMAP = True
+            return joblib_parmap(new_func, generator)
+        finally:
+            SETTINGS.PARALLEL.PMAP = False

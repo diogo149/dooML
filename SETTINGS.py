@@ -33,4 +33,5 @@ FEATURE_STORE.CV_FOLDS = 16  # note that changing this in the middle of an exper
 PARALLEL = Setting()
 PARALLEL.JOBS = -1
 PARALLEL.JOBLIB_VERBOSE = 0
-PARALLEL.JOBLIB_PRE_DISPATCH = '2 * n_jobs'
+PARALLEL.JOBLIB_PRE_DISPATCH = 'n_jobs'
+PARALLEL.PMAP = False

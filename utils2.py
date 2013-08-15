@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.cross_validation import StratifiedKFold, KFold
 
 from utils import fit_transform, args_expander, kfold_feature_scorer, machine_score_func
-from parallel import parfor, joblib_parmap
+from parallel import parfor, pmap
 
 
 def cv_fit_transform(trn, X, y=None, stratified=False, n_folds=3):
@@ -20,7 +20,7 @@ def cv_fit_transform(trn, X, y=None, stratified=False, n_folds=3):
     n_folds = min(n_folds, rows)
     kfold = list(StratifiedKFold(y, n_folds) if stratified else KFold(rows, n_folds, shuffle=True))
     items = ((trn, X[train_idx], y[train_idx], X[test_idx]) for train_idx, test_idx in kfold)
-    mapped = joblib_parmap(args_expander, items, fit_transform)
+    mapped = pmap(args_expander, items, fit_transform)
     transformed = [None] * rows
     for (_, test_idx), vals in zip(kfold, mapped):
         for idx, val in zip(test_idx, vals):
