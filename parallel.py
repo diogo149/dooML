@@ -107,7 +107,10 @@ def random_parmap(func, in_vals, args=(), kwargs={}, n_jobs=1):
 def joblib_parmap(func, generator):
     """ parallel map using joblib, but it pickles input arguments and thus can't be used for dynamically generated functions.
     """
-    new_func = delayed(func)
+    try:
+        new_func = delayed(func)
+    except TypeError e:
+        raise PicklingError(e)
     return joblib_run(new_func(item) for item in generator)
 
 
