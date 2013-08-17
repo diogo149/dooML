@@ -40,6 +40,7 @@
     -set_debug_logging
     -naive_sample_tune
     -sample_tune
+    -sql_repr
 
 """
 from __future__ import print_function, division
@@ -506,3 +507,11 @@ def sample_tune(trn, X_col, y_col=1, y_categories=1, seconds=10):
             guess = last_guess * (seconds / time_taken) ** (1.0 / growth)
         guess = int(round(guess))
     return last_guess
+
+
+def sql_repr(x):
+    """ repr function for sql statements
+    """
+    if isinstance(x, unicode):
+        return sql_repr(str(x))
+    return repr(x)

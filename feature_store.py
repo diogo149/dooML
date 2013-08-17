@@ -11,7 +11,8 @@ implementation notes:
 import sqlite3
 
 import SETTINGS
-from utils import all_iterable, random_seed, bool_to_int, memmap_hstack
+from decorators import untested, log
+from utils import all_iterable, random_seed, bool_to_int, memmap_hstack, sql_repr
 from storage import joblib_load, joblib_save
 from classes import GenericObject
 from utils2 import cv_fit_transform
@@ -75,6 +76,13 @@ class FeatureStore(GenericObject):
         """ returns the children of the input id
         """
         # TODO
+
+    def dependency(self, node_id):
+        """ returns input node as a dependency
+        """
+        node = self.node(node_id)
+        label = (node.basename, node.index)
+        return FeatureDependency(parent_labels=[label])
 
     def query_dependencies(self, dep):
         """ find a set of parent ids for a dependency
@@ -174,8 +182,11 @@ class FeatureNode(GenericObject):
         warning: for user created nodes, have label be a string
 
         assumptions:
-            -numbers fit in 32 bit float
+            -if label is None, the transform is converted to a string and used
+            -if y is None, an empty dependency is used
         """
+        if label is None:
+            label = filter(str.isalnum, str(trn))[:200]
         self.basename, self.index = FeatureNode.parse_label(label)
         self.trn = trn
         self.tags = set(tags)
@@ -257,7 +268,7 @@ class FeatureNode(GenericObject):
     def valid_name(name):
         """ True if name is valid
         """
-        return len(name) <= 255 and name.isalnum()
+        return len(name) <= 200 and name.isalnum()
 
     @staticmethod
     def valid_index(index):
@@ -335,8 +346,8 @@ class FeatureDB(GenericObject):
         ('EXCLUDES2', 'ID INTEGER, EXCLUDE_ID INTEGER'),
         ('PARENT_TAGS2', 'ID INTEGER, TAG_ID INTEGER'),
         ('EXCLUDE_TAGS2', 'ID INTEGER, TAG_ID INTEGER'),
-        ('TAGS', 'TAG VARCHAR(255) UNIQUE'),
-        ('BASENAMES', 'BASENAME VARCHAR(255) UNIQUE'),
+        ('TAGS', 'TAG VARCHAR(200) UNIQUE'),
+        ('BASENAMES', 'BASENAME VARCHAR(200) UNIQUE'),
     )
 
     def __init__(self):
@@ -376,7 +387,7 @@ class FeatureDB(GenericObject):
         """ insert values into table
         """
         cmd = 'INSERT OR IGNORE' if or_ignore else 'INSERT'
-        self.sql('{} INTO {} VALUES({})'.format(cmd, table_name, ",".join(map(repr, values))))
+        self.sql('{} INTO {} VALUES({})'.format(cmd, table_name, ",".join(map(sql_repr, values))))
 
     def last_insert_rowid(self):
         """ get the rowid of the last insert
@@ -389,7 +400,7 @@ class FeatureDB(GenericObject):
         sqls = ['SELECT {} FROM {}'.format(values, table_name)]
         if conditions:
             sqls.append('WHERE')
-            sqls.append(' AND '.join(['{}={}'.format(column, repr(value)) for column, value in conditions]))
+            sqls.append(' AND '.join(['{}={}'.format(column, sql_repr(value)) for column, value in conditions]))
         return self.sql(' '.join(sqls))
 
     def select_before(self, table_name, values, rowid, *conditions):
@@ -397,7 +408,7 @@ class FeatureDB(GenericObject):
         """
         sqls = ['SELECT {} FROM {}'.format(values, table_name)]
         sqls.append('WHERE ROWID<{}'.format(rowid))
-        sqls.append(' AND '.join(['{}={}'.format(column, repr(value)) for column, value in conditions]))
+        sqls.append(' AND '.join(['{}={}'.format(column, sql_repr(value)) for column, value in conditions]))
         return self.sql(' '.join(sqls))
 
     def update(self, table_name, update_expr, *conditions):
@@ -406,7 +417,7 @@ class FeatureDB(GenericObject):
         sqls = ['UPDATE {} SET {}'.format(table_name, update_expr)]
         if conditions:
             sqls.append('WHERE')
-            sqls += ['{}={}'.format(column, repr(value)) for column, value in conditions]
+            sqls += ['{}={}'.format(column, sql_repr(value)) for column, value in conditions]
         return self.sql(' '.join(sqls))
 
     def get_id(self, table_name, value):
@@ -536,3 +547,31 @@ class FeatureDB(GenericObject):
         """
         self.conn.commit()
         self.conn.close()
+
+
+@untested
+class NodeFactory(GenericObject):
+
+    """ factory to quickly add nodes to a feature store """
+
+    def __init__(self, store=None):
+        if store is None:
+            store = FeatureStore()
+        self.store = store
+
+    @log
+    def foreach(self, input_tag, transform, label=None, new_tags=(), y=None, stratified=False):
+        """ for each node matching input tag, create a new descendant node using input transform
+        """
+        nodes = []
+        for parent_node_id in self.store.query_tag(input_tag):
+            X = self.store.dependency(parent_node_id)
+            node = self.store.create(label, transform, new_tags, X, y=y, stratified=stratified)
+            nodes.append(node)
+        return nodes
+
+    @log
+    def forall(self, input_tag, transform, label=None, new_tags=(), y=None, stratified=False):
+        """ create a descendant node to all nodes matching input tag """
+        X = FeatureDependency(parent_tags=[input_tag])
+        return self.store.create(label, transform, new_tags, X, y=y, stratified=stratified)

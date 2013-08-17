@@ -8,9 +8,13 @@
     -RowApply
     -ColApply
     -row_normalizer
+    -sklearn_bridge
+    -FeastBridge
+    -feast_bridge
 
 """
 import numpy as np
+import importlib
 
 from functools import partial
 
@@ -82,8 +86,9 @@ class SklearnBridge(GenericTransform):
 
     def _fit(self, X, y=None):
         if y is not None and y.shape[1] == 1:
-            y = y.flatten()
-        self.clf.fit(X, y)
+            self.clf.fit(X, y.flatten())
+        else:
+            self.clf.fit(X)  # this is necessary because some models (e.g. GMM) do not take a y
 
     def _transform(self, X):
         if hasattr(self.clf, "predict_proba"):
@@ -132,10 +137,10 @@ class SparseFiltering(GenericTransform):
     """ Machine for calling sparse filtering algorithm.
     """
 
-    _default_args = dict(N=1000)
+    _default_args = dict(n_components=1000)
 
     def _fit(self, X, y=None):
-        self.W = sparse_filtering.sparseFiltering(self.N, X.T)
+        self.W = sparse_filtering.sparseFiltering(self.n_components, X.T)
 
     def _transform(self, X):
         return sparse_filtering.feedForwardSF(self.W, X.T)
@@ -174,17 +179,53 @@ class sklearn_bridge(object):
     """ class to easily import scikit-learn transforms already wrapper with a SklearnBridge
     """
 
-    def __init__(self, __submodule=None):
-        if __submodule is None:
-            self.__submodule = __import__("sklearn")
-        else:
-            self.__submodule = __submodule
+    def __init__(self, __submodule="sklearn", __prev=None):
+        if __prev is None:
+            __prev = []
+        self.__prev = __prev
+        self.__submodule = __submodule
 
     def __getattr__(self, name):
-        return sklearn_bridge(getattr(self.__submodule, name))
+        return sklearn_bridge(name, self.__prev + [self.__submodule])
 
     def __call__(self, *args, **kwargs):
-        if hasattr(self.__submodule, "fit"):
-            return SklearnBridge(clf=self.__submodule(*args, **kwargs))
+        imported = importlib.import_module(".".join(self.__prev))
+        tmp = getattr(imported, self.__submodule)
+        if hasattr(tmp, "fit"):
+            return SklearnBridge(clf=tmp(*args, **kwargs))
         else:
-            return self.__submodule(*args, **kwa)
+            return tmp(*args, **kwargs)
+
+
+class FeastBridge(GenericTransform):
+
+    """ class to wrap PyFeast functions
+    """
+
+    _required_args = ('feast_func', 'n_select')
+
+    def _fit(self, X, y):
+        self.features = self.feast_func(data=X, labels=y.flatten(), n_select=self.n_select)
+
+    def _transform(self, X):
+        return X[:, self.features]
+
+
+class feast_bridge(object):
+
+    """ class to easily import PyFeast functions already wrapped as a transform
+    """
+
+    def __init__(self, __submodule="feast", __prev=None):
+        if __prev is None:
+            __prev = []
+        self.__prev = __prev
+        self.__submodule = __submodule
+
+    def __getattr__(self, name):
+        return feast_bridge(name, self.__prev + [self.__submodule])
+
+    def __call__(self, n_select, *args, **kwargs):
+        imported = importlib.import_module(".".join(self.__prev))
+        feast_func = getattr(imported, self.__submodule)
+        return FeastBridge(feast_func=feast_func, n_select=n_select)

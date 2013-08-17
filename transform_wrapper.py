@@ -78,6 +78,10 @@ class ColSubset(TransformWrapper):
         X = X[:, self.subset]
         return self.trn.fit(X, y)
 
+    def transform(self, X):
+        X = X[:, self.subset]
+        return self.trn.transform(X)
+
 
 def pmap_helper(subset, X, y, trn):
     trn = RowSubset(subset=subset, trn=deepcopy(trn))
@@ -90,7 +94,7 @@ class RejectionSample(TransformWrapper):
     """ uses rejection sampling with input weights
     """
 
-    _default_args = dict(weights=None, train_size=None, n_iter=100)
+    _default_args = dict(weights=None, train_size=None, n_iter=100, combine="mean")
 
     def fit(self, X, y=None):
         X = to_memmap(X)
@@ -111,7 +115,10 @@ class RejectionSample(TransformWrapper):
         return self
 
     def transform(self, X):
-        return np.mean([trn.transform(X) for trn in self.trns], axis=0)
+        if self.combine == "mean":
+            return np.mean([trn.transform(X) for trn in self.trns], axis=0)
+        elif self.combine == "median":
+            return np.median([trn.transform(X) for trn in self.trns], axis=0)
 
 
 def tuned_rejection_sample(trn, X_col, weights=None, n_iter=100, y_col=1, y_categories=1, seconds=10):
