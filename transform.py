@@ -205,7 +205,7 @@ class FeastBridge(GenericTransform):
     _required_args = ('feast_func', 'n_select')
 
     def _fit(self, X, y):
-        self.features = self.feast_func(data=X, labels=y.flatten(), n_select=self.n_select)
+        self.features = self.feast_func(data=X.astype(np.float64), labels=y.flatten().astype(np.float64), n_select=self.n_select)
 
     def _transform(self, X):
         return X[:, self.features]

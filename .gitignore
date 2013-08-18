@@ -1,4 +1,7 @@
 trials/
+feature.db
+feature.db-journal
+__TRAIN__
 
 *.py[cod]
 

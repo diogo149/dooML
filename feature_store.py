@@ -7,11 +7,12 @@
 implementation notes:
     -need ability to draw / list tree (?)
 """
-
 import sqlite3
 
+from copy import deepcopy
+
 import SETTINGS
-from decorators import untested, log
+from decorators import log
 from utils import all_iterable, random_seed, bool_to_int, memmap_hstack, sql_repr
 from storage import joblib_load, joblib_save
 from classes import GenericObject
@@ -358,6 +359,7 @@ class FeatureDB(GenericObject):
         for table_name, schema in FeatureDB.TABLES:
             self.create(table_name, schema)
 
+    @log
     def sql(self, sql):
         """ run sql command
         """
@@ -549,7 +551,6 @@ class FeatureDB(GenericObject):
         self.conn.close()
 
 
-@untested
 class NodeFactory(GenericObject):
 
     """ factory to quickly add nodes to a feature store """
@@ -563,15 +564,12 @@ class NodeFactory(GenericObject):
     def foreach(self, input_tag, transform, label=None, new_tags=(), y=None, stratified=False):
         """ for each node matching input tag, create a new descendant node using input transform
         """
-        nodes = []
         for parent_node_id in self.store.query_tag(input_tag):
             X = self.store.dependency(parent_node_id)
-            node = self.store.create(label, transform, new_tags, X, y=y, stratified=stratified)
-            nodes.append(node)
-        return nodes
+            self.store.create(label, deepcopy(transform), new_tags, X, y=y, stratified=stratified)
 
     @log
     def forall(self, input_tag, transform, label=None, new_tags=(), y=None, stratified=False):
         """ create a descendant node to all nodes matching input tag """
         X = FeatureDependency(parent_tags=[input_tag])
-        return self.store.create(label, transform, new_tags, X, y=y, stratified=stratified)
+        return self.store.create(label, deepcopy(transform), new_tags, X, y=y, stratified=stratified)
