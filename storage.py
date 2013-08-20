@@ -20,12 +20,15 @@
     -quick_read2
     -joblib_save
     -joblib_load
+    -dumps
+    -loads
 
 """
 import gc
 import cPickle as pickle
 import shelve
 import joblib
+import zlib
 from os import makedirs, path
 
 import SETTINGS
@@ -235,7 +238,7 @@ def joblib_save(directory, basename, obj):
     try_mkdir(directory)
     full_filename = filename(directory, basename, "pickle")
     new_filename = backup_filename(full_filename, write_mode=True, num=2)
-    joblib.dump(obj, new_filename, compress=0)
+    joblib.dump(obj, new_filename, compress=SETTINGS.STORAGE.JOBLIB_COMPRESSION)
 
 
 def joblib_load(directory, basename):
@@ -244,3 +247,20 @@ def joblib_load(directory, basename):
     full_filename = filename(directory, basename, "pickle")
     new_filename = backup_filename(full_filename, write_mode=False, num=2)
     return joblib.load(new_filename, mmap_mode='r')
+
+
+def dumps(obj):
+    """ returns pickle string of an object
+    """
+    pickle_str = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+    if SETTINGS.STORAGE.COMPRESSION > 0:
+        pickle_str = zlib.compress(pickle_str, SETTINGS.STORAGE.COMPRESSION)
+    return pickle_str
+
+
+def loads(dumped):
+    """ returns object from a pickle string
+    """
+    if SETTINGS.STORAGE.COMPRESSION > 0:
+        dumped = zlib.decompress(dumped)
+    return pickle.loads(dumped)

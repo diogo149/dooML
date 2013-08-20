@@ -3,6 +3,7 @@
     -FeatureNode
     -FeatureDependency
     -FeatureDB
+    -NodeFactory
 
 implementation notes:
     -need ability to draw / list tree (?)
@@ -363,8 +364,6 @@ class FeatureDB(GenericObject):
     def sql(self, sql):
         """ run sql command
         """
-        if SETTINGS.FEATURE_STORE.DEBUG_SQL:
-            print(sql)
         try:
             c = self.conn.cursor()
             return c.execute(sql).fetchall()

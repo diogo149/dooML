@@ -26,7 +26,6 @@ UTILS.MEMMAP_DTYPE = np.float32
 
 FEATURE_STORE = Setting()
 FEATURE_STORE.DB = "feature.db"
-FEATURE_STORE.DEBUG_SQL = False
 FEATURE_STORE.DATA_NAME = "__TRAIN__"
 FEATURE_STORE.CV_FOLDS = 16  # note that changing this in the middle of an experiment may make results less reproducible
 
@@ -35,3 +34,7 @@ PARALLEL.JOBS = -1
 PARALLEL.JOBLIB_VERBOSE = 0
 PARALLEL.JOBLIB_PRE_DISPATCH = 'n_jobs'
 PARALLEL.PMAP = False
+
+STORAGE = Setting()
+STORAGE.JOBLIB_COMPRESSION = 9
+STORAGE.COMPRESSION = 1

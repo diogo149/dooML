@@ -1,3 +1,9 @@
+feature_store
+    -use database to store pickled transforms
+        -look into SQLAlchemy
+    -regression ensemble
+        -use parallel map for tuning transforms
+
 sampling_machine
     -make parallel
 
@@ -13,6 +19,9 @@ Trial
 decorators
     -add more logging
     -use logging for timer as well (but at a lower setting) and use more places
+
+ranking
+    -make ranking transform
 
 to make:
     -rejection sampler
